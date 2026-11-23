@@ -539,6 +539,27 @@ impl Store {
         ensure(path.is_file(), "Anhang nicht gefunden")?;
         Ok(path)
     }
+    pub fn read_attachment(&self, id: &str) -> Result<Vec<u8>> {
+        use std::io::Read;
+        let state = self.load()?;
+        ensure(
+            state
+                .tasks
+                .iter()
+                .any(|t| t.attachments.iter().any(|a| a.id == id)),
+            "Anhang ist keiner Aufgabe zugeordnet",
+        )?;
+        let file = fs::File::open(self.attachment_path(id)?).map_err(|e| e.to_string())?;
+        let mut bytes = Vec::new();
+        file.take(20 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        ensure(
+            bytes.len() <= 20 * 1024 * 1024,
+            "Datei ist größer als 20 MB",
+        )?;
+        Ok(bytes)
+    }
     pub fn backup(&self, destination: &Path) -> Result<()> {
         use std::io::Write;
         let s = self.load()?;
@@ -729,6 +750,7 @@ mod tests {
             b"Hallo"
         );
         assert_eq!(restored.settings.ai_access, "off");
+        assert_eq!(target.read_attachment(&attachment.id).unwrap(), b"Hallo");
     }
     #[test]
     fn repeat_creates_one_next_occurrence() {
@@ -750,6 +772,14 @@ mod tests {
     fn attachment_paths_cannot_escape() {
         let (_dir, s) = store();
         assert!(s.attachment_path("../klar.db").is_err());
+    }
+    #[test]
+    fn preview_cannot_read_unreferenced_files() {
+        let (_dir, s) = store();
+        let id = Uuid::new_v4().to_string();
+        fs::write(s.root.join("attachments").join(&id), b"orphan").unwrap();
+        assert!(s.read_attachment(&id).is_err());
+        assert!(s.read_attachment("../klar.db").is_err());
     }
     #[test]
     fn completing_from_editor_creates_the_next_occurrence_once() {

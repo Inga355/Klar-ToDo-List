@@ -48,6 +48,10 @@ fn attach_file(
 fn attachment_path(store: tauri::State<Store>, id: String) -> store::Result<String> {
     Ok(store.attachment_path(&id)?.to_string_lossy().into())
 }
+#[tauri::command]
+fn read_attachment(store: tauri::State<Store>, id: String) -> store::Result<String> {
+    Ok(base64::engine::general_purpose::STANDARD.encode(store.read_attachment(&id)?))
+}
 fn export_destination(store: &Store, path: &str) -> store::Result<std::path::PathBuf> {
     let path = std::path::PathBuf::from(path);
     let parent = path
@@ -135,6 +139,7 @@ pub fn run() {
             mutate,
             attach_file,
             attachment_path,
+            read_attachment,
             save_attachment,
             export_backup,
             import_backup,
