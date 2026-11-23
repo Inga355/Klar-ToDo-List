@@ -33,7 +33,7 @@ Speicherort: `%APPDATA%\de.klar.todo`. Darin liegen `klar.db`, `attachments`, `b
 
 Unter **Einstellungen → Sicherung** eine `.klar`-Datei exportieren. Sie enthält Aufgaben, Projekte und alle referenzierten Anhänge. Diese Datei auf einem zweiten Datenträger sichern. Lokale automatische Kopien schützen nicht vor einem Festplattenausfall.
 
-Eine tägliche Sicherung entsteht beim ersten Hintergrundlauf mit vorhandenen Daten. Beim Import wird vorher eine weitere Sicherheitskopie angelegt. Der Import ersetzt Aufgaben und Projekte und deaktiviert den KI-Zugriff. Sicherungen und entfernte Anhangsdateien werden nicht automatisch gelöscht; bei vielen großen Anhängen den Speicherplatz im Blick behalten.
+Eine tägliche Sicherung entsteht beim ersten Hintergrundlauf mit vorhandenen Daten und wird bei Änderungen alle fünf Minuten aktualisiert. Beim Import wird vorher eine weitere Sicherheitskopie angelegt. Der Import ersetzt Aufgaben und Projekte und deaktiviert den KI-Zugriff. Sicherungen und entfernte Anhangsdateien werden nicht automatisch gelöscht; bei vielen großen Anhängen den Speicherplatz im Blick behalten.
 
 ## Grenzen der ersten Version
 

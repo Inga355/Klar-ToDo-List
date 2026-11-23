@@ -21,7 +21,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npm run test:e2e
+      - run: cargo test --manifest-path src-tauri/Cargo.toml -j 2
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -j 2 -- -D warnings
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: npm run package
       - uses: actions/upload-artifact@v4

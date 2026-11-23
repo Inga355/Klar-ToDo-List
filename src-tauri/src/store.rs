@@ -751,4 +751,68 @@ mod tests {
         let (_dir, s) = store();
         assert!(s.attachment_path("../klar.db").is_err());
     }
+    #[test]
+    fn completing_from_editor_creates_the_next_occurrence_once() {
+        let (_dir, s) = store();
+        let mut t = task();
+        t.repeat = "daily".into();
+        s.apply(
+            Operation::SaveTask {
+                task: t.clone().into(),
+            },
+            Some(0),
+            "test",
+        )
+        .unwrap();
+        t.status = "done".into();
+        let next = s
+            .apply(Operation::SaveTask { task: t.into() }, Some(1), "test")
+            .unwrap();
+        assert_eq!(next.tasks.len(), 2);
+        let completed = next
+            .tasks
+            .iter()
+            .find(|t| t.status == "done")
+            .unwrap()
+            .clone();
+        let next = s
+            .apply(
+                Operation::SaveTask {
+                    task: completed.into(),
+                },
+                Some(2),
+                "test",
+            )
+            .unwrap();
+        assert_eq!(next.tasks.len(), 2);
+    }
+    #[test]
+    fn invalid_backup_does_not_replace_existing_data() {
+        let (dir, s) = store();
+        s.apply(
+            Operation::SaveTask {
+                task: task().into(),
+            },
+            Some(0),
+            "test",
+        )
+        .unwrap();
+        let bad = dir.path().join("bad.klar");
+        fs::write(&bad, b"not a zip").unwrap();
+        assert!(s.restore(&bad, 1).is_err());
+        assert_eq!(s.load().unwrap().tasks.len(), 1);
+        assert_eq!(s.load().unwrap().revision, 1);
+    }
+    #[test]
+    fn conflicting_attachment_upload_does_not_leave_a_file() {
+        let (_dir, s) = store();
+        let t = task();
+        let id = t.id.clone();
+        s.apply(Operation::SaveTask { task: t.into() }, Some(0), "test")
+            .unwrap();
+        assert!(s
+            .add_attachment(&id, "test.txt".into(), "text/plain".into(), b"test", 0)
+            .is_err());
+        assert_eq!(fs::read_dir(s.root.join("attachments")).unwrap().count(), 0);
+    }
 }
