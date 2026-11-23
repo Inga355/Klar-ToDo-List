@@ -1,11 +1,14 @@
 name: Klar checks
 on:
   push:
-    branches: ['codex/**', main]
+    branches: [main]
   pull_request:
     branches: [main]
 permissions:
   contents: read
+concurrency:
+  group: klar-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-latest
