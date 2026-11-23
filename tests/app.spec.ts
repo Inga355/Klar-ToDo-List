@@ -6,6 +6,41 @@ async function addTask(page: Page, title: string) {
   return page.getByRole("dialog");
 }
 
+test("Rückgängig und Konfliktschutz erhalten den Aufgabenstand", async ({
+  page,
+  context,
+}) => {
+  await page.goto("/");
+  let dialog = await addTask(page, "Vertrag prüfen");
+  await dialog.getByLabel("In meinen Tagesfokus").check();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Vertrag prüfen abhaken" }).click();
+  await page.getByRole("button", { name: "Rückgängig", exact: true }).click();
+  await page.getByText("Vertrag prüfen", { exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Notizen", { exact: true })
+    .fill("Dieser Entwurf darf nicht still verloren gehen.");
+  await dialog
+    .getByRole("button", { name: "Schließen", exact: true })
+    .first()
+    .click();
+  await expect(
+    dialog.getByText("Ungespeicherte Änderungen verwerfen?"),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Weiter bearbeiten", exact: true })
+    .click();
+  const mini = await context.newPage();
+  await mini.goto("/?mini=1");
+  await mini.getByRole("checkbox", { name: "Vertrag prüfen abhaken" }).click();
+  await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(dialog.locator(".toast.error")).toBeVisible();
+  await expect(dialog.getByLabel("Notizen", { exact: true })).toHaveValue(
+    "Dieser Entwurf darf nicht still verloren gehen.",
+  );
+});
+
 test("Projekte und Aufgaben bleiben nach einem Neustart erhalten", async ({
   page,
 }) => {
