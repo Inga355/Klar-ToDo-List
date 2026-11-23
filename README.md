@@ -17,6 +17,7 @@ npm run desktop
 
 - Projekte, Aufgaben, Unteraufgaben, Ampelprioritäten und Tagesfokus.
 - Dashboard, Monats-/Wochenkalender, Suche und Gruppierung.
+- Einklappbare Tagesgruppen in Übersicht/Mein Tag und ein eigener strikter Heute-fällig-Filter mit Überfälligkeitsmarkierung.
 - Notizen, Dateianhänge und Screenshot-Einfügen.
 - Zentrale Dokumentenübersicht mit Projekt-/Statusfiltern und lokaler Vorschau für Bilder, PDFs, Textdateien und Aufgabennotizen.
 - Hintergrund-Erinnerungen, wiederkehrende Aufgaben, Tray und optionaler Autostart.
