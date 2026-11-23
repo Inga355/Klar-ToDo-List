@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import * as api from "./api";
 import { invoke } from "@tauri-apps/api/core";
+import { createPortal } from "react-dom";
 import {
   AppState,
   Attachment,
@@ -865,41 +866,50 @@ export default function App() {
           </>
         )}
       </main>
-      {error && (
-        <div className="toast error" role="alert">
-          <span>{error}</span>
-          <button
-            className="icon-button"
-            aria-label="Fehlermeldung schließen"
-            onClick={() => setError("")}
-          >
-            <X size={17} />
-          </button>
-        </div>
-      )}
-      {notice && !error && (
-        <div className="toast" role="status">
-          <Check size={17} />
-          {notice}
-          {notice === "Erledigt – gut gemacht." && undo && (
+      {error &&
+        createPortal(
+          <div className="toast error" role="alert">
+            <span>{error}</span>
             <button
-              className="text-button"
-              onClick={() =>
-                run(async () => {
-                  await apply(
-                    { type: "toggle_task", id: undo.id },
-                    undo.revision,
-                  );
-                  setUndo(null);
-                  setNotice("Aufgabe wieder geöffnet");
-                })
-              }
+              className="icon-button"
+              aria-label="Fehlermeldung schließen"
+              onClick={() => setError("")}
             >
-              Rückgängig
+              <X size={17} />
             </button>
-          )}
-        </div>
-      )}
+          </div>,
+          (editor || projectEditor || settingsOpen
+            ? document.querySelector("dialog[open]")
+            : null) ?? document.body,
+        )}
+      {notice &&
+        !error &&
+        createPortal(
+          <div className="toast" role="status">
+            <Check size={17} />
+            {notice}
+            {notice === "Erledigt – gut gemacht." && undo && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  run(async () => {
+                    await apply(
+                      { type: "toggle_task", id: undo.id },
+                      undo.revision,
+                    );
+                    setUndo(null);
+                    setNotice("Aufgabe wieder geöffnet");
+                  })
+                }
+              >
+                Rückgängig
+              </button>
+            )}
+          </div>,
+          (editor || projectEditor || settingsOpen
+            ? document.querySelector("dialog[open]")
+            : null) ?? document.body,
+        )}
       {editor && (
         <TaskEditor
           key={editor.id}
