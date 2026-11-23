@@ -9,7 +9,7 @@
     "test": "vitest run",
     "tauri": "tauri",
     "desktop": "tauri dev",
-    "package": "tauri build --bundles nsis",
+    "package": "node scripts/package.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
