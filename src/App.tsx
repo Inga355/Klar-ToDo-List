@@ -18,6 +18,7 @@ import {
   CircleHelp,
   Clock3,
   Download,
+  FileText,
   Folder,
   Home,
   Inbox,
@@ -39,6 +40,8 @@ import {
 import * as api from "./api";
 import { invoke } from "@tauri-apps/api/core";
 import { createPortal } from "react-dom";
+import DocumentOverview from "./DocumentOverview";
+import { version as appVersion } from "../package.json";
 import {
   AppState,
   Attachment,
@@ -66,6 +69,7 @@ type View =
   | "all"
   | "inbox"
   | "done"
+  | "documents"
   | `project:${string}`;
 const isMini = new URLSearchParams(location.search).has("mini");
 const dateLong = () =>
@@ -221,6 +225,7 @@ export default function App() {
       all: "Alle Aufgaben",
       inbox: "Ein guter Platz für neue Ideen.",
       done: "Geschafft.",
+      documents: "Deine Unterlagen. Ein Ort.",
     }[view as string] ??
     project?.name ??
     "Aufgaben";
@@ -306,6 +311,7 @@ export default function App() {
                 ["calendar", CalendarDays, "Kalender"],
                 ["all", ListTodo, "Alle Aufgaben"],
                 ["inbox", Inbox, "Eingang"],
+                ["documents", FileText, "Dokumente"],
               ] as const
             ).map(([id, Icon, label]) => (
               <button
@@ -611,7 +617,13 @@ export default function App() {
                 </button>
               </div>
             )}
-            {view === "calendar" ? (
+            {view === "documents" ? (
+              <DocumentOverview
+                tasks={state.tasks}
+                projects={state.projects}
+                onOpenTask={edit}
+              />
+            ) : view === "calendar" ? (
               <CalendarView
                 tasks={state.tasks}
                 projects={state.projects}
@@ -1888,7 +1900,7 @@ function SettingsDialog({
       </div>
       <footer className="dialog-footer">
         <span className="field-hint">
-          Klar 0.1.0 · Lokal. Übersichtlich. Dein.
+          Klar {appVersion} · Lokal. Übersichtlich. Dein.
         </span>
         <div className="spacer" />
         <button className="primary" onClick={onClose}>

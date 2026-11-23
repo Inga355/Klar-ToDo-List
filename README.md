@@ -18,6 +18,7 @@ npm run desktop
 - Projekte, Aufgaben, Unteraufgaben, Ampelprioritäten und Tagesfokus.
 - Dashboard, Monats-/Wochenkalender, Suche und Gruppierung.
 - Notizen, Dateianhänge und Screenshot-Einfügen.
+- Zentrale Dokumentenübersicht mit Projekt-/Statusfiltern und lokaler Vorschau für Bilder, PDFs, Textdateien und Aufgabennotizen.
 - Hintergrund-Erinnerungen, wiederkehrende Aufgaben, Tray und optionaler Autostart.
 - Separate Desktop-Miniansicht mit Filtern und Anheften.
 - SQLite, vollständige Sicherungen und optionaler lokaler MCP-Zugriff.

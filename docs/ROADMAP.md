@@ -11,6 +11,7 @@ Jeder Meilenstein erhält kleine Commits und eine eigene PR nach main. Abhängig
 | M4 | Planung | Dashboard, Kalender, Termine, Wiederholungen, Erinnerungen |
 | M5 | Desktop-Miniansicht | Eigenes Fenster, Filter, Anheften, synchronisierte Aufgaben |
 | M6 | Auslieferung und Integration | Sicherung/Wiederherstellung, lokale KI-Schnittstelle, Installer |
+| M7 | Dokumentenübersicht | Zentrale Dateien/Notizen, Suche, Projekt-/Statusfilter, lokale Vorschau und Aufgabenverknüpfungen; Aufbewahrung als abgestimmtes Folgekonzept |
 
 ## Qualitätsziele
 

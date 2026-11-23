@@ -108,6 +108,33 @@ export async function attachmentUrl(attachment: Attachment): Promise<string> {
     await invoke<string>("attachment_path", { id: attachment.id }),
   );
 }
+export async function readAttachment(
+  attachment: Attachment,
+): Promise<Uint8Array> {
+  if (!native)
+    throw new Error(
+      "Dateivorschauen sind in der installierten Desktop-App verfügbar.",
+    );
+  const content = await invoke<string>("read_attachment", {
+    id: attachment.id,
+  });
+  return Uint8Array.from(atob(content), (c) => c.charCodeAt(0));
+}
+export async function exportAttachment(
+  attachment: Attachment,
+): Promise<boolean> {
+  if (!native)
+    throw new Error(
+      "Dateien können in der installierten Desktop-App exportiert werden.",
+    );
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const path = await save({
+    defaultPath: attachment.name.split(/[\\/]/).pop(),
+  });
+  if (!path) return false;
+  await invoke("save_attachment", { id: attachment.id, path });
+  return true;
+}
 export async function openMini(): Promise<void> {
   if (native) await invoke("open_mini");
   else window.open("/?mini=1", "klar-mini", "width=390,height=560");
