@@ -140,7 +140,7 @@ p {
   background: #332d28;
 }
 .nav-item.selected {
-  background: #e27415;
+  background: var(--orange);
   color: #1e160e;
   font-weight: 650;
   box-shadow: 0 3px 14px #0002;
@@ -521,7 +521,7 @@ p {
   padding: 0;
 }
 .task-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #efe5da;
   display: flex;
@@ -530,7 +530,7 @@ p {
   overflow-wrap: anywhere;
 }
 .task-meta {
-  font-size: 10px;
+  font-size: 11px;
   color: #bead9c;
   display: flex;
   align-items: center;
@@ -801,6 +801,16 @@ p {
 }
 .spacer {
   flex: 1;
+}
+.discard-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  font-size: 11px;
+  padding-bottom: 10px;
+  color: #f3c29b;
 }
 .field {
   display: flex;
@@ -1261,10 +1271,10 @@ input[type="checkbox"] {
   align-items: flex-start;
 }
 .mini-app .task-title {
-  font-size: 12px;
+  font-size: 13px;
 }
 .mini-app .task-meta {
-  font-size: 9px;
+  font-size: 10px;
 }
 .mini-app .task-symbols {
   display: none;

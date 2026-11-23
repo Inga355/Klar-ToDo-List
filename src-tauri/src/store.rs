@@ -103,7 +103,7 @@ impl Default for AppState {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
-    SaveTask { task: Task },
+    SaveTask { task: Box<Task> },
     ToggleTask { id: String },
     DeleteTask { id: String },
     SaveProject { project: Project },
@@ -260,6 +260,62 @@ pub fn validate(state: &AppState) -> Result<()> {
     )
 }
 
+fn next_occurrence(original: &Task, today: NaiveDate) -> Result<Task> {
+    use chrono::TimeZone;
+    let mut next = original.clone();
+    let old = NaiveDate::parse_from_str(
+        next.due_date.as_ref().ok_or("Fälligkeitsdatum fehlt")?,
+        "%Y-%m-%d",
+    )
+    .map_err(|e| e.to_string())?;
+    let mut date = old;
+    loop {
+        date = if next.repeat == "monthly" {
+            date.checked_add_months(Months::new(1))
+        } else {
+            date.checked_add_days(Days::new(if next.repeat == "weekly" { 7 } else { 1 }))
+        }
+        .ok_or("Datum außerhalb des Bereichs")?;
+        if date > today {
+            break;
+        }
+    }
+    next.id = Uuid::new_v4().to_string();
+    next.due_date = Some(date.to_string());
+    let delta = date.signed_duration_since(old);
+    for field in [&mut next.planned_at, &mut next.reminder_at] {
+        if let Some(value) = field.as_ref() {
+            let local = DateTime::parse_from_rfc3339(value)
+                .map_err(|e| e.to_string())?
+                .with_timezone(&Local)
+                .naive_local()
+                + delta;
+            // Preserve local clock time through daylight saving transitions.
+            let shifted = Local
+                .from_local_datetime(&local)
+                .earliest()
+                .or_else(|| {
+                    Local
+                        .from_local_datetime(&(local + chrono::Duration::hours(1)))
+                        .earliest()
+                })
+                .ok_or("Zeitpunkt existiert lokal nicht")?;
+            *field = Some(shifted.to_rfc3339());
+        }
+    }
+    next.reminded_at = None;
+    next.focus = false;
+    next.status = "open".into();
+    next.completed_at = None;
+    next.created_at = Utc::now().to_rfc3339();
+    next.updated_at = next.created_at.clone();
+    for sub in &mut next.subtasks {
+        sub.done = false;
+        sub.id = Uuid::new_v4().to_string();
+    }
+    Ok(next)
+}
+
 impl Store {
     pub fn new(root: PathBuf) -> Result<Self> {
         fs::create_dir_all(root.join("attachments")).map_err(|e| e.to_string())?;
@@ -343,8 +399,17 @@ impl Store {
             Operation::Settings { .. } => "Einstellungen gespeichert".into(),
         };
         self.change(expected, source, &action, |s| {
+            if source == "mcp" && s.settings.ai_access != "write" {
+                return Err("KI-Schreibzugriff ist nicht freigegeben".into());
+            }
             match op {
-                Operation::SaveTask { mut task } => {
+                Operation::SaveTask { task } => {
+                    let mut task = *task;
+                    let was_done = s
+                        .tasks
+                        .iter()
+                        .find(|t| t.id == task.id)
+                        .is_some_and(|t| t.status == "done");
                     if let Some(old) = s.tasks.iter().find(|t| t.id == task.id) {
                         ensure(
                             task.attachments.iter().all(|a| {
@@ -370,6 +435,11 @@ impl Store {
                     }
                     task.updated_at = Utc::now().to_rfc3339();
                     if task.status == "done" {
+                        if !was_done && task.repeat != "none" {
+                            s.tasks
+                                .push(next_occurrence(&task, Local::now().date_naive())?);
+                            task.repeat = "none".into();
+                        }
                         task.completed_at
                             .get_or_insert_with(|| Utc::now().to_rfc3339());
                     } else {
@@ -392,52 +462,8 @@ impl Store {
                         s.tasks[index].completed_at = None;
                     } else {
                         if s.tasks[index].repeat != "none" {
-                            let mut next = s.tasks[index].clone();
-                            let old_date = NaiveDate::parse_from_str(
-                                next.due_date.as_ref().ok_or("Fälligkeitsdatum fehlt")?,
-                                "%Y-%m-%d",
-                            )
-                            .map_err(|e| e.to_string())?;
-                            let mut date = old_date;
-                            // Catch up missed occurrences without flooding the task list.
-                            loop {
-                                date =
-                                    if next.repeat == "monthly" {
-                                        date.checked_add_months(Months::new(1))
-                                    } else {
-                                        date.checked_add_days(Days::new(
-                                            if next.repeat == "weekly" { 7 } else { 1 },
-                                        ))
-                                    }
-                                    .ok_or("Datum außerhalb des Bereichs")?;
-                                if date > Local::now().date_naive() {
-                                    break;
-                                }
-                            }
-                            next.id = Uuid::new_v4().to_string();
-                            next.due_date = Some(date.to_string());
-                            let delta = date.signed_duration_since(old_date);
-                            for field in [&mut next.planned_at, &mut next.reminder_at] {
-                                if let Some(v) = field.as_ref() {
-                                    *field = Some(
-                                        (DateTime::parse_from_rfc3339(v)
-                                            .map_err(|e| e.to_string())?
-                                            + delta)
-                                            .to_rfc3339(),
-                                    );
-                                }
-                            }
-                            next.reminded_at = None;
-                            next.focus = false;
-                            next.status = "open".into();
-                            next.completed_at = None;
-                            next.created_at = Utc::now().to_rfc3339();
-                            next.updated_at = next.created_at.clone();
-                            for sub in &mut next.subtasks {
-                                sub.done = false;
-                                sub.id = Uuid::new_v4().to_string();
-                            }
-                            s.tasks.push(next);
+                            s.tasks
+                                .push(next_occurrence(&s.tasks[index], Local::now().date_naive())?);
                             s.tasks[index].repeat = "none".into();
                         }
                         s.tasks[index].status = "done".into();
@@ -646,8 +672,14 @@ mod tests {
     fn persists_and_rejects_stale_writes() {
         let (_dir, s) = store();
         let t = task();
-        s.apply(Operation::SaveTask { task: t.clone() }, Some(0), "test")
-            .unwrap();
+        s.apply(
+            Operation::SaveTask {
+                task: t.clone().into(),
+            },
+            Some(0),
+            "test",
+        )
+        .unwrap();
         assert_eq!(s.load().unwrap().tasks.len(), 1);
         assert!(s
             .apply(Operation::DeleteTask { id: t.id.clone() }, Some(0), "test")
@@ -663,12 +695,18 @@ mod tests {
         let mut t = task();
         t.due_date = Some("2026-02-30".into());
         assert!(s
-            .apply(Operation::SaveTask { task: t.clone() }, Some(0), "test")
+            .apply(
+                Operation::SaveTask {
+                    task: t.clone().into()
+                },
+                Some(0),
+                "test"
+            )
             .is_err());
         t.due_date = None;
         t.project_id = Some(Uuid::new_v4().to_string());
         assert!(s
-            .apply(Operation::SaveTask { task: t }, Some(0), "test")
+            .apply(Operation::SaveTask { task: t.into() }, Some(0), "test")
             .is_err());
         assert_eq!(s.load().unwrap().revision, 0);
     }
@@ -677,7 +715,7 @@ mod tests {
         let (dir, s) = store();
         let t = task();
         let id = t.id.clone();
-        s.apply(Operation::SaveTask { task: t }, Some(0), "test")
+        s.apply(Operation::SaveTask { task: t.into() }, Some(0), "test")
             .unwrap();
         s.add_attachment(&id, "Notiz.txt".into(), "text/plain".into(), b"Hallo", 1)
             .unwrap();
@@ -698,7 +736,7 @@ mod tests {
         let mut t = task();
         t.repeat = "weekly".into();
         let id = t.id.clone();
-        s.apply(Operation::SaveTask { task: t }, Some(0), "test")
+        s.apply(Operation::SaveTask { task: t.into() }, Some(0), "test")
             .unwrap();
         let state = s
             .apply(Operation::ToggleTask { id }, Some(1), "test")
@@ -712,5 +750,69 @@ mod tests {
     fn attachment_paths_cannot_escape() {
         let (_dir, s) = store();
         assert!(s.attachment_path("../klar.db").is_err());
+    }
+    #[test]
+    fn completing_from_editor_creates_the_next_occurrence_once() {
+        let (_dir, s) = store();
+        let mut t = task();
+        t.repeat = "daily".into();
+        s.apply(
+            Operation::SaveTask {
+                task: t.clone().into(),
+            },
+            Some(0),
+            "test",
+        )
+        .unwrap();
+        t.status = "done".into();
+        let next = s
+            .apply(Operation::SaveTask { task: t.into() }, Some(1), "test")
+            .unwrap();
+        assert_eq!(next.tasks.len(), 2);
+        let completed = next
+            .tasks
+            .iter()
+            .find(|t| t.status == "done")
+            .unwrap()
+            .clone();
+        let next = s
+            .apply(
+                Operation::SaveTask {
+                    task: completed.into(),
+                },
+                Some(2),
+                "test",
+            )
+            .unwrap();
+        assert_eq!(next.tasks.len(), 2);
+    }
+    #[test]
+    fn invalid_backup_does_not_replace_existing_data() {
+        let (dir, s) = store();
+        s.apply(
+            Operation::SaveTask {
+                task: task().into(),
+            },
+            Some(0),
+            "test",
+        )
+        .unwrap();
+        let bad = dir.path().join("bad.klar");
+        fs::write(&bad, b"not a zip").unwrap();
+        assert!(s.restore(&bad, 1).is_err());
+        assert_eq!(s.load().unwrap().tasks.len(), 1);
+        assert_eq!(s.load().unwrap().revision, 1);
+    }
+    #[test]
+    fn conflicting_attachment_upload_does_not_leave_a_file() {
+        let (_dir, s) = store();
+        let t = task();
+        let id = t.id.clone();
+        s.apply(Operation::SaveTask { task: t.into() }, Some(0), "test")
+            .unwrap();
+        assert!(s
+            .add_attachment(&id, "test.txt".into(), "text/plain".into(), b"test", 0)
+            .is_err());
+        assert_eq!(fs::read_dir(s.root.join("attachments")).unwrap().count(), 0);
     }
 }

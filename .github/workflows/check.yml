@@ -1,11 +1,14 @@
 name: Klar checks
 on:
   push:
-    branches: ['codex/**', main]
+    branches: [main]
   pull_request:
     branches: [main]
 permissions:
   contents: read
+concurrency:
+  group: klar-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   windows:
     runs-on: windows-latest
@@ -21,9 +24,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: npm run test:e2e
+      - run: cargo test --manifest-path src-tauri/Cargo.toml -j 2
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -j 2 -- -D warnings
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: npm run package
+      - run: node scripts/check-mcp.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: Klar-Windows-Installer

@@ -37,6 +37,8 @@ import {
   X,
 } from "lucide-react";
 import * as api from "./api";
+import { invoke } from "@tauri-apps/api/core";
+import { createPortal } from "react-dom";
 import {
   AppState,
   Attachment,
@@ -87,6 +89,9 @@ export default function App() {
   const [projectEditor, setProjectEditor] = useState<Project | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [undo, setUndo] = useState<{ id: string; revision: number } | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(dayKey());
@@ -244,7 +249,12 @@ export default function App() {
             onOpen={() => edit(t)}
             onToggle={() =>
               run(async () => {
-                await apply({ type: "toggle_task", id: t.id });
+                const next = await apply({ type: "toggle_task", id: t.id });
+                setUndo(
+                  t.status !== "done" && t.repeat === "none"
+                    ? { id: t.id, revision: next.revision }
+                    : null,
+                );
                 setNotice(
                   t.status === "done"
                     ? "Aufgabe wieder geöffnet"
@@ -384,7 +394,9 @@ export default function App() {
         {isMini ? (
           <header className="mini-header" data-tauri-drag-region>
             <div data-tauri-drag-region>
-              <span className="eyebrow" data-tauri-drag-region>KLAR / MINIANSICHT</span>
+              <span className="eyebrow" data-tauri-drag-region>
+                KLAR / MINIANSICHT
+              </span>
               <h1 data-tauri-drag-region>Mein Tag</h1>
             </div>
             <div className="header-actions">
@@ -854,24 +866,50 @@ export default function App() {
           </>
         )}
       </main>
-      {error && (
-        <div className="toast error" role="alert">
-          <span>{error}</span>
-          <button
-            className="icon-button"
-            aria-label="Fehlermeldung schließen"
-            onClick={() => setError("")}
-          >
-            <X size={17} />
-          </button>
-        </div>
-      )}
-      {notice && !error && (
-        <div className="toast" role="status">
-          <Check size={17} />
-          {notice}
-        </div>
-      )}
+      {error &&
+        createPortal(
+          <div className="toast error" role="alert">
+            <span>{error}</span>
+            <button
+              className="icon-button"
+              aria-label="Fehlermeldung schließen"
+              onClick={() => setError("")}
+            >
+              <X size={17} />
+            </button>
+          </div>,
+          (editor || projectEditor || settingsOpen
+            ? document.querySelector("dialog[open]")
+            : null) ?? document.body,
+        )}
+      {notice &&
+        !error &&
+        createPortal(
+          <div className="toast" role="status">
+            <Check size={17} />
+            {notice}
+            {notice === "Erledigt – gut gemacht." && undo && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  run(async () => {
+                    await apply(
+                      { type: "toggle_task", id: undo.id },
+                      undo.revision,
+                    );
+                    setUndo(null);
+                    setNotice("Aufgabe wieder geöffnet");
+                  })
+                }
+              >
+                Rückgängig
+              </button>
+            )}
+          </div>,
+          (editor || projectEditor || settingsOpen
+            ? document.querySelector("dialog[open]")
+            : null) ?? document.body,
+        )}
       {editor && (
         <TaskEditor
           key={editor.id}
@@ -1106,9 +1144,24 @@ function TaskEditor({
   const [attaching, setAttaching] = useState(false);
   const [sub, setSub] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [discardConfirm, setDiscardConfirm] = useState(false);
+  const savedDraft = useRef(JSON.stringify(task));
+  useEffect(() => {
+    savedDraft.current = JSON.stringify(task);
+  }, [task.updatedAt]);
+  const requestClose = () => {
+    if (attaching || busy) return;
+    if (JSON.stringify(task) !== savedDraft.current) setDiscardConfirm(true);
+    else onClose();
+  };
   const fileRef = useRef<HTMLInputElement>(null);
   const update = (patch: Partial<Task>) => onDraft({ ...task, ...patch });
   const attachFile = async (file: File) => {
+    if (attaching || busy) return;
+    if (!task.title.trim()) {
+      setError("Bitte zuerst einen Aufgabentitel eingeben.");
+      return;
+    }
     setAttaching(true);
     setError("");
     try {
@@ -1131,9 +1184,7 @@ function TaskEditor({
   return (
     <Dialog
       title={exists ? "Deine Aufgabe" : "Ein neuer Schritt"}
-      onClose={() => {
-        if (!attaching) onClose();
-      }}
+      onClose={requestClose}
       wide
     >
       <form
@@ -1148,7 +1199,7 @@ function TaskEditor({
           }
         }}
       >
-        <div className="dialog-body">
+        <div className="dialog-body" inert={busy || attaching}>
           <label className="field title-field">
             Was möchtest du erledigen?
             <input
@@ -1177,7 +1228,8 @@ function TaskEditor({
             </label>
             <label className="field">
               Priorität
-                <select aria-label="Priorität"
+              <select
+                aria-label="Priorität"
                 value={task.priority}
                 onChange={(e) =>
                   update({ priority: e.target.value as Task["priority"] })
@@ -1341,6 +1393,7 @@ function TaskEditor({
             <button
               type="button"
               className="secondary"
+              aria-label="Unteraufgabe hinzufügen"
               disabled={!sub.trim()}
               onClick={() => {
                 update({
@@ -1421,6 +1474,21 @@ function TaskEditor({
           )}
         </div>
         <footer className="dialog-footer">
+          {discardConfirm && (
+            <div className="discard-confirm">
+              <span>Ungespeicherte Änderungen verwerfen?</span>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setDiscardConfirm(false)}
+              >
+                Weiter bearbeiten
+              </button>
+              <button type="button" className="danger" onClick={onClose}>
+                Verwerfen
+              </button>
+            </div>
+          )}
           {exists &&
             (deleteConfirm ? (
               <div className="delete-confirm">
@@ -1456,7 +1524,7 @@ function TaskEditor({
             type="button"
             className="secondary"
             disabled={attaching || busy}
-            onClick={onClose}
+            onClick={requestClose}
           >
             Schließen
           </button>
@@ -1517,7 +1585,6 @@ function AttachmentCard({
               defaultPath: a.name.split(/[\\/]/).pop(),
             });
             if (path) {
-              const { invoke } = await import("@tauri-apps/api/core");
               await invoke("save_attachment", { id: a.id, path });
             }
           })().catch((e) => setError(message(e)));
@@ -1704,7 +1771,6 @@ function SettingsDialog({
             className="secondary"
             onClick={() =>
               perform(async () => {
-                const { invoke } = await import("@tauri-apps/api/core");
                 await invoke("test_notification");
                 onNotice("Testbenachrichtigung angefordert");
               })

@@ -1,4 +1,5 @@
 mod desktop;
+pub mod mcp;
 pub mod store;
 use base64::Engine;
 use store::{AppState, Operation, Store};
@@ -16,6 +17,9 @@ fn mutate(
     expected_revision: u64,
 ) -> store::Result<AppState> {
     let state = store.apply(operation, Some(expected_revision), "app")?;
+    if let Some(window) = app.get_webview_window("mini") {
+        let _ = window.set_always_on_top(state.settings.mini_pinned);
+    }
     let _ = app.emit("state-changed", state.revision);
     Ok(state)
 }
@@ -62,6 +66,23 @@ fn save_attachment(store: tauri::State<Store>, id: String, path: String) -> stor
     let destination = export_destination(&store, &path)?;
     std::fs::copy(store.attachment_path(&id)?, destination).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+fn export_backup(store: tauri::State<Store>, path: String) -> store::Result<()> {
+    let destination = export_destination(&store, &path)?;
+    store.backup(&destination)
+}
+#[tauri::command]
+fn import_backup(
+    app: tauri::AppHandle,
+    store: tauri::State<Store>,
+    path: String,
+    expected_revision: u64,
+) -> store::Result<AppState> {
+    let state = store.restore(std::path::Path::new(&path), expected_revision)?;
+    let _ = app.emit("state-changed", state.revision);
+    Ok(state)
 }
 
 pub fn run() {
@@ -115,6 +136,8 @@ pub fn run() {
             attach_file,
             attachment_path,
             save_attachment,
+            export_backup,
+            import_backup,
             desktop::open_main,
             desktop::open_mini,
             desktop::test_notification

@@ -84,6 +84,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     std::thread::spawn(move || {
         let mut last_revision = u64::MAX;
         let mut last_backup = String::new();
+        let mut backup_revision = u64::MAX;
+        let mut last_backup_at = std::time::Instant::now();
         loop {
             if let Ok(s) = background_store.load() {
                 if s.revision != last_revision {
@@ -91,13 +93,19 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     last_revision = s.revision;
                 }
                 let date = chrono::Local::now().date_naive().to_string();
-                if last_backup != date && s.revision > 0 {
+                if s.revision > 0
+                    && (last_backup != date
+                        || (backup_revision != s.revision
+                            && last_backup_at.elapsed().as_secs() >= 300))
+                {
                     let path = background_store
                         .root
                         .join("backups")
                         .join(format!("automatisch-{date}.klar"));
-                    if path.exists() || background_store.backup(&path).is_ok() {
+                    if background_store.backup(&path).is_ok() {
                         last_backup = date;
+                        backup_revision = s.revision;
+                        last_backup_at = std::time::Instant::now();
                     }
                 }
                 for t in s

@@ -11,8 +11,8 @@
   },
   "app": {
     "windows": [
-      {"label":"main", "title":"Klar", "width":1280, "height":860, "minWidth":860, "minHeight":620, "backgroundColor":"#211f1d", "dragDropEnabled":false},
-      {"label":"mini", "title":"Klar · Miniansicht", "url":"index.html?mini=1", "width":390, "height":560, "minWidth":340, "minHeight":350, "visible":false, "skipTaskbar":true, "backgroundColor":"#2a2520", "dragDropEnabled":false}
+      {"label":"main", "title":"Klar", "theme":"Dark", "width":1280, "height":860, "minWidth":860, "minHeight":620, "backgroundColor":"#211f1d", "dragDropEnabled":false},
+      {"label":"mini", "title":"Klar · Miniansicht", "theme":"Dark", "url":"index.html?mini=1", "width":390, "height":560, "minWidth":340, "minHeight":350, "visible":false, "skipTaskbar":true, "backgroundColor":"#2a2520", "dragDropEnabled":false}
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'",
