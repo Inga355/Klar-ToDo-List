@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   ArrowDownUp,
+  ArrowLeft,
   ArrowUpRight,
   Bell,
   CalendarDays,
@@ -41,6 +42,14 @@ import * as api from "./api";
 import { invoke } from "@tauri-apps/api/core";
 import { createPortal } from "react-dom";
 import DocumentOverview from "./DocumentOverview";
+import TaskSections from "./TaskSections";
+import {
+  dayGroup,
+  daysOverdue,
+  isDueTodayOrOverdue,
+  isOverdue,
+  planningDay,
+} from "./taskPlanning";
 import { version as appVersion } from "../package.json";
 import {
   AppState,
@@ -65,6 +74,8 @@ import {
 type View =
   | "overview"
   | "today"
+  | "dueToday"
+  | "overdue"
   | "calendar"
   | "all"
   | "inbox"
@@ -165,8 +176,11 @@ export default function App() {
     editorRevision.current = stateRef.current!.revision;
     setEditor(structuredClone(task));
   };
-  const add = () =>
-    edit(freshTask(view.startsWith("project:") ? view.slice(8) : null));
+  const add = () => {
+    const task = freshTask(view.startsWith("project:") ? view.slice(8) : null);
+    if (view === "dueToday") task.dueDate = dayKey();
+    edit(task);
+  };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -193,20 +207,36 @@ export default function App() {
       </div>
     );
   const active = state.tasks.filter((t) => t.status !== "done");
-  const today = active.filter((t) => isToday(t, clock));
-  const overdue = active.filter((t) => t.dueDate && t.dueDate < clock);
+  const today = active.filter((t) => dayGroup(t, clock) === "today");
+  const overdue = active.filter((t) => isOverdue(t, clock));
+  const planningView = ["overview", "today", "dueToday", "overdue"].includes(
+    view,
+  );
+  const dueFilter = view === "dueToday" || view === "overdue";
+  const navigateDue = (target: "dueToday" | "overdue") => {
+    setSearch("");
+    setPriority("all");
+    setSort("due");
+    setView(target);
+  };
+  const returnToOverview = () => {
+    setSearch("");
+    setPriority("all");
+    setView("overview");
+  };
   const project = state.projects.find((p) => `project:${p.id}` === view);
   let tasks =
     view === "done"
       ? state.tasks.filter((t) => t.status === "done")
-      : view === "today"
-        ? today
-        : view === "inbox"
-          ? active.filter((t) => !t.projectId)
-          : project
-            ? active.filter((t) => t.projectId === project.id)
-            : active;
-  if (view === "overview") tasks = today;
+      : view === "dueToday"
+        ? active.filter((t) => isDueTodayOrOverdue(t, clock))
+        : view === "overdue"
+          ? overdue
+          : view === "inbox"
+            ? active.filter((t) => !t.projectId)
+            : project
+              ? active.filter((t) => t.projectId === project.id)
+              : active;
   tasks = orderTasks(
     tasks.filter(
       (t) =>
@@ -216,11 +246,14 @@ export default function App() {
           .includes(search.toLocaleLowerCase("de")),
     ),
     sort,
+    planningView ? (t) => planningDay(t) ?? "9999" : undefined,
   );
   const title =
     {
       overview: "Dein Tag. Dein Überblick.",
       today: "Mein Tag",
+      dueToday: "Heute fällig",
+      overdue: "Überfällig",
       calendar: "Deine Zeit im Blick.",
       all: "Alle Aufgaben",
       inbox: "Ein guter Platz für neue Ideen.",
@@ -252,6 +285,7 @@ export default function App() {
             project={state.projects.find((p) => p.id === t.projectId)}
             busy={busy}
             onOpen={() => edit(t)}
+            today={clock}
             onToggle={() =>
               run(async () => {
                 const next = await apply({ type: "toggle_task", id: t.id });
@@ -296,7 +330,9 @@ export default function App() {
     );
 
   return (
-    <div className={isMini ? "mini-app" : "app"}>
+    <div
+      className={`${isMini ? "mini-app" : "app"}${!isMini && planningView ? " planning-view" : ""}`}
+    >
       {!isMini && (
         <aside className="sidebar">
           <div className="brand">
@@ -316,7 +352,7 @@ export default function App() {
             ).map(([id, Icon, label]) => (
               <button
                 key={id}
-                className={`nav-item ${view === id ? "selected" : ""}`}
+                className={`nav-item ${view === id || (dueFilter && id === "overview") ? "selected" : ""}`}
                 onClick={() => setView(id)}
               >
                 <Icon size={19} />
@@ -455,13 +491,17 @@ export default function App() {
                 <div className="eyebrow">{dateLong()}</div>
                 <h1>{title}</h1>
                 <p>
-                  {view === "overview"
-                    ? "Alles Wichtige an einem Ort. Schritt für Schritt."
-                    : project
-                      ? `${active.filter((t) => t.projectId === project.id).length} offene Aufgaben in deinem Projekt`
-                      : view === "done"
-                        ? "Jeder Haken ist ein Schritt nach vorn."
-                        : "Dein Plan, in deinem Tempo."}
+                  {view === "dueToday"
+                    ? "Heute fällige und überfällige Aufgaben."
+                    : view === "overdue"
+                      ? "Aufgaben mit überschrittener Fälligkeit."
+                      : view === "overview" || view === "today"
+                        ? "Heute im Fokus. Morgen im Blick."
+                        : project
+                          ? `${active.filter((t) => t.projectId === project.id).length} offene Aufgaben in deinem Projekt`
+                          : view === "done"
+                            ? "Jeder Haken ist ein Schritt nach vorn."
+                            : "Dein Plan, in deinem Tempo."}
                 </p>
               </div>
               <div className="header-actions">
@@ -559,9 +599,17 @@ export default function App() {
           </>
         ) : (
           <>
-            {view === "overview" && (
+            {planningView && (
               <div className="stats">
-                <button className="stat-card" onClick={() => setView("today")}>
+                <button
+                  className={`stat-card ${view === "dueToday" ? "active" : ""}`}
+                  aria-label="Heute fällig"
+                  aria-pressed={view === "dueToday"}
+                  onClick={() => navigateDue("dueToday")}
+                >
+                  {view === "dueToday" && (
+                    <Check size={16} className="stat-selected-check" />
+                  )}
                   <span className="stat-icon">
                     <CalendarDays size={22} />
                   </span>
@@ -574,11 +622,10 @@ export default function App() {
                   </span>
                 </button>
                 <button
-                  className="stat-card"
-                  onClick={() => {
-                    setView("today");
-                    setSort("due");
-                  }}
+                  className={`stat-card ${view === "overdue" ? "active overdue-selected" : ""}`}
+                  aria-label="Überfällig"
+                  aria-pressed={view === "overdue"}
+                  onClick={() => navigateDue("overdue")}
                 >
                   <span className="stat-icon red">
                     <Clock3 size={22} />
@@ -617,6 +664,24 @@ export default function App() {
                 </button>
               </div>
             )}
+            {dueFilter && (
+              <div className="due-filter-bar">
+                <button
+                  className="due-filter-chip"
+                  onClick={returnToOverview}
+                  aria-label="Fälligkeitsfilter entfernen"
+                >
+                  {view === "dueToday"
+                    ? "Heute + überfällig"
+                    : "Nur überfällig"}
+                  <X size={14} />
+                </button>
+                <button className="text-button" onClick={returnToOverview}>
+                  <ArrowLeft size={17} />
+                  Gesamte Übersicht
+                </button>
+              </div>
+            )}
             {view === "documents" ? (
               <DocumentOverview
                 tasks={state.tasks}
@@ -646,15 +711,19 @@ export default function App() {
                 <div className="section-heading">
                   <div>
                     <span className="section-kicker">
-                      {view === "overview" ? "HEUTE ZÄHLT" : "DEINE AUFGABEN"}
+                      {planningView ? "KLAR GEPLANT" : "DEINE AUFGABEN"}
                     </span>
                     <h2>
-                      {view === "overview"
-                        ? "Mein Fokus & mein Tag"
-                        : view === "done"
-                          ? "Erledigte Aufgaben"
-                          : (project?.name ?? "Aufgaben")}{" "}
-                      <span className="subtle-count">{tasks.length}</span>
+                      {dueFilter
+                        ? `${tasks.length} ${tasks.length === 1 ? "Aufgabe" : "Aufgaben"} ${view === "overdue" ? "überfällig" : "für deinen Tag"}`
+                        : planningView
+                          ? "Deine Aufgaben"
+                          : view === "done"
+                            ? "Erledigte Aufgaben"
+                            : (project?.name ?? "Aufgaben")}{" "}
+                      {!dueFilter && (
+                        <span className="subtle-count">{tasks.length}</span>
+                      )}
                     </h2>
                   </div>
                   {view === "overview" && <Star size={20} className="accent" />}
@@ -697,46 +766,65 @@ export default function App() {
                       <option value="title">Nach Titel</option>
                     </select>
                   </label>
-                  <label className="select-wrap">
-                    <span className="sr-only">Gruppieren</span>
-                    <select
-                      value={group}
-                      onChange={(e) => setGroup(e.target.value)}
-                    >
-                      <option value="none">Ohne Gruppen</option>
-                      <option value="project">Nach Projekt</option>
-                      <option value="date">Nach Datum</option>
-                    </select>
-                  </label>
+                  {!planningView && (
+                    <label className="select-wrap">
+                      <span className="sr-only">Gruppieren</span>
+                      <select
+                        value={group}
+                        onChange={(e) => setGroup(e.target.value)}
+                      >
+                        <option value="none">Ohne Gruppen</option>
+                        <option value="project">Nach Projekt</option>
+                        <option value="date">Nach Datum</option>
+                      </select>
+                    </label>
+                  )}
                 </div>
-                {group === "none"
-                  ? taskList(tasks)
-                  : [
-                      ...new Set(
-                        tasks.map((t) =>
-                          group === "project"
-                            ? (t.projectId ?? "")
-                            : (t.dueDate ?? ""),
-                        ),
+                {planningView ? (
+                  <TaskSections
+                    key={dueFilter ? view : "all"}
+                    tasks={tasks}
+                    today={clock}
+                    mode={
+                      view === "dueToday"
+                        ? "dueToday"
+                        : view === "overdue"
+                          ? "overdue"
+                          : "all"
+                    }
+                    filtered={!!search.trim() || priority !== "all"}
+                    renderTasks={taskList}
+                  />
+                ) : group === "none" ? (
+                  taskList(tasks)
+                ) : (
+                  [
+                    ...new Set(
+                      tasks.map((t) =>
+                        group === "project"
+                          ? (t.projectId ?? "")
+                          : (t.dueDate ?? ""),
                       ),
-                    ].map((key) => (
-                      <div className="task-group" key={key}>
-                        <h3>
-                          {group === "project"
-                            ? (state.projects.find((p) => p.id === key)?.name ??
-                              "Eingang")
-                            : dateLabel(key || null)}
-                        </h3>
-                        {taskList(
-                          tasks.filter(
-                            (t) =>
-                              (group === "project"
-                                ? (t.projectId ?? "")
-                                : (t.dueDate ?? "")) === key,
-                          ),
-                        )}
-                      </div>
-                    ))}
+                    ),
+                  ].map((key) => (
+                    <div className="task-group" key={key}>
+                      <h3>
+                        {group === "project"
+                          ? (state.projects.find((p) => p.id === key)?.name ??
+                            "Eingang")
+                          : dateLabel(key || null)}
+                      </h3>
+                      {taskList(
+                        tasks.filter(
+                          (t) =>
+                            (group === "project"
+                              ? (t.projectId ?? "")
+                              : (t.dueDate ?? "")) === key,
+                        ),
+                      )}
+                    </div>
+                  ))
+                )}
               </section>
             )}
             {view === "overview" && (
@@ -1016,16 +1104,22 @@ function TaskRow({
   busy,
   onOpen,
   onToggle,
+  today,
 }: {
   task: Task;
   project?: Project;
   busy: boolean;
   onOpen: () => void;
   onToggle: () => void;
+  today: string;
 }) {
-  const overdue = t.status !== "done" && !!t.dueDate && t.dueDate < dayKey();
+  const overdue = isOverdue(t, today);
+  const lateDays = daysOverdue(t, today);
+  const plannedDay = t.plannedAt ? dayKey(new Date(t.plannedAt)) : null;
   return (
-    <div className={`task-row ${t.status === "done" ? "completed" : ""}`}>
+    <div
+      className={`task-row ${t.status === "done" ? "completed" : ""} ${overdue ? "task-overdue" : ""}`}
+    >
       <button
         className="checkbox"
         role="checkbox"
@@ -1053,16 +1147,27 @@ function TaskRow({
             </>
           ) : null}
           <span className={overdue ? "overdue" : ""}>
-            {dateLabel(t.dueDate)}
-            {overdue ? " · überfällig" : ""}
+            {t.dueDate
+              ? dateLabel(t.dueDate)
+              : plannedDay
+                ? `Geplant: ${dateLabel(plannedDay)}`
+                : "Ohne Datum"}
           </span>
           {t.plannedAt && (
             <span>
               ·{" "}
+              {t.dueDate && plannedDay !== t.dueDate
+                ? `Geplant: ${dateLabel(plannedDay)}, `
+                : ""}
               {new Date(t.plannedAt).toLocaleTimeString("de-DE", {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
+            </span>
+          )}
+          {overdue && (
+            <span className="overdue-badge">
+              {lateDays} {lateDays === 1 ? "Tag" : "Tage"} überfällig
             </span>
           )}
           {t.status !== "open" && t.status !== "done" && (

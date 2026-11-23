@@ -85,15 +85,19 @@ export function isToday(t: Task, today = dayKey()): boolean {
       (!!t.plannedAt && dayKey(new Date(t.plannedAt)) === today))
   );
 }
-export function orderTasks(tasks: Task[], order = "due"): Task[] {
+export function orderTasks(
+  tasks: Task[],
+  order = "due",
+  dateForTask: (task: Task) => string = (t) => t.dueDate ?? "9999",
+): Task[] {
   const rank = { high: 0, normal: 1, low: 2 };
   return [...tasks].sort((a, b) =>
     order === "priority"
       ? rank[a.priority] - rank[b.priority] ||
-        (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999")
+        dateForTask(a).localeCompare(dateForTask(b))
       : order === "title"
         ? a.title.localeCompare(b.title, "de")
-        : (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") ||
+        : dateForTask(a).localeCompare(dateForTask(b)) ||
           rank[a.priority] - rank[b.priority],
   );
 }

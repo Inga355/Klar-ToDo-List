@@ -5,7 +5,9 @@
 Klar über das Desktopsymbol oder das Startmenü öffnen. Beim ersten Start gibt es keine Beispieldaten. Über **+ Aufgabe** eine Aufgabe erfassen; Projekte über **+** in der Seitenleiste anlegen.
 
 - Rot: hohe Priorität, Gelb: normal, Grün: niedrig. Überfälligkeit wird zusätzlich angezeigt.
-- **Mein Tag** zeigt Tagesfokus, heute fällige/geplante und überfällige Aufgaben.
+- **Übersicht** und **Mein Tag** zeigen alle offenen Aufgaben unter **Heute**, **Morgen** und **Später zu erledigen**. Die Bereiche lassen sich einzeln einklappen. Das Fälligkeitsdatum bestimmt die Gruppe; fehlt es, zählt der lokale geplante Tag. Aufgaben ohne beide Datumsangaben stehen unter „Später zu erledigen“. Ein Fokus-Stern verändert die Datumsgruppe nicht.
+- Die Karte **Heute fällig** zeigt ausschließlich heute fällige und überfällige Aufgaben, getrennt in **Überfällig** und **Heute**. Zukunftsaufgaben, undatierte Fokusaufgaben und reine Arbeitsplanung ohne passende Fälligkeit sind ausgeschlossen. Über **Gesamte Übersicht** oder das Kreuz am Filter kehrst du zurück.
+- Die Karte **Überfällig** zeigt nur Aufgaben mit überschrittener Fälligkeit. Dezente rote Markierung und Verspätung in Kalendertagen sind unabhängig von der Ampelpriorität.
 - **Alle Aufgaben** kann nach Projekt/Datum gruppiert sowie nach Datum/Priorität/Titel sortiert werden.
 - Häkchen erledigen Aufgaben; unter **Erledigt** lassen sie sich wieder öffnen.
 - Notizen, Unteraufgaben und Dateianhänge stehen im Aufgabenfenster bereit. Dateianhänge speichern auch den aktuellen Entwurf.
@@ -22,6 +24,8 @@ Die App überprüft Erinnerungen alle 15 Sekunden und holt verpasste Erinnerunge
 ## Miniansicht
 
 Über **Miniansicht** oben rechts oder im Menü des Klar-Symbols neben der Windows-Uhr öffnen. Filter: Heute/überfällig, Fokus, alle offenen Aufgaben oder ein Projekt. Die Stecknadel hält das Fenster im Vordergrund. Fenstergröße und Position bleiben erhalten. Das Schließen der Miniansicht blendet nur dieses Fenster aus.
+
+Die Miniansicht behält ihren persönlichen Tagesfilter mit Tagesfokus und geplanter Arbeit. Der strikte Fälligkeitsfilter ist über die Karte „Heute fällig“ im Hauptfenster erreichbar.
 
 ## Dokumente und Aufgabennotizen
 
