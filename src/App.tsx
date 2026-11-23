@@ -382,10 +382,10 @@ export default function App() {
           </div>
         )}
         {isMini ? (
-          <header className="mini-header">
-            <div>
-              <span className="eyebrow">KLAR / MINIANSICHT</span>
-              <h1>Mein Tag</h1>
+          <header className="mini-header" data-tauri-drag-region>
+            <div data-tauri-drag-region>
+              <span className="eyebrow" data-tauri-drag-region>KLAR / MINIANSICHT</span>
+              <h1 data-tauri-drag-region>Mein Tag</h1>
             </div>
             <div className="header-actions">
               <button
@@ -394,13 +394,6 @@ export default function App() {
                 aria-pressed={state.settings.miniPinned}
                 onClick={() =>
                   run(async () => {
-                    if (api.native) {
-                      const { getCurrentWindow } =
-                        await import("@tauri-apps/api/window");
-                      await getCurrentWindow().setAlwaysOnTop(
-                        !state.settings.miniPinned,
-                      );
-                    }
                     await apply({
                       type: "settings",
                       settings: {
@@ -1184,7 +1177,7 @@ function TaskEditor({
             </label>
             <label className="field">
               Priorität
-              <select
+                <select aria-label="Priorität"
                 value={task.priority}
                 onChange={(e) =>
                   update({ priority: e.target.value as Task["priority"] })
@@ -1277,6 +1270,7 @@ function TaskEditor({
           <label className="field">
             Notizen
             <textarea
+              aria-label="Notizen"
               rows={4}
               maxLength={200000}
               placeholder="Gedanken, Details und Links …"
