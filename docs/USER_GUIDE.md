@@ -23,6 +23,16 @@ Die App überprüft Erinnerungen alle 15 Sekunden und holt verpasste Erinnerunge
 
 Über **Miniansicht** oben rechts oder im Menü des Klar-Symbols neben der Windows-Uhr öffnen. Filter: Heute/überfällig, Fokus, alle offenen Aufgaben oder ein Projekt. Die Stecknadel hält das Fenster im Vordergrund. Fenstergröße und Position bleiben erhalten. Das Schließen der Miniansicht blendet nur dieses Fenster aus.
 
+## Dokumente und Aufgabennotizen
+
+Unter **Dokumente** findest du alle zu Aufgaben gehörenden Dateien und nicht leeren Aufgabennotizen. Auch Inhalte erledigter Aufgaben bleiben dort erhalten. Geteilte Anhänge, etwa aus wiederkehrenden Aufgaben, erscheinen einmal mit ihren jeweiligen Aufgabenverknüpfungen.
+
+Die Suche findet Dateinamen, Aufgabentitel, Projekte und Aufgabennotizen. Sie durchsucht nicht den Inhalt von PDF-/Office-Dateien. Filter begrenzen die Ergebnisse nach Projekt, Dateiart und offenen/erledigten Aufgaben. Bei geteilten Dateien beziehen sich diese Filter auf dieselbe Aufgabenverknüpfung.
+
+Ein Klick zeigt die lokale Vorschau: Bilder, PDFs mit Seitenwechsel, Textdateien oder die Aufgabennotiz. Andere Formate, etwa Word-Dateien, können exportiert und in einem passenden Programm geöffnet werden. Für verschlüsselte oder nicht unterstützte PDFs steht ebenfalls der Export bereit. Die Textvorschau zeigt bis zu 200.000 Zeichen; die Originaldatei wird dabei nicht verändert. Über die Aufgabenverknüpfung kannst du Notizen bearbeiten und neue Dateien anhängen.
+
+Es gibt noch keine automatische Löschung nach Erledigung. Der Vorschlag dafür steht in [Aufbewahrungskonzept](RETENTION_CONCEPT.md). Die Übersicht verändert keine Aufbewahrungsfristen und verschiebt keine Dateien.
+
 ## Beenden und Autostart
 
 Standardmäßig bleibt Klar beim Schließen des Hauptfensters im Infobereich aktiv. Vollständig beenden: Rechtsklick auf das Klar-Symbol → **Klar beenden**. Die Einstellungen enthalten Autostart und einen Benachrichtigungstest.
