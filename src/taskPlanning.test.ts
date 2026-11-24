@@ -150,3 +150,30 @@ it("zeigt nur am lokalen Abschlusstag erledigte Aufgaben in Heute, ohne sie zu l
   expect(task.status).toBe("done");
   expect(() => moveToDay(task, "today")).toThrow();
 });
+it("löst bei unverändertem Erinnerungstermin keine zweite Benachrichtigung aus", () => {
+  const task = {
+    ...freshTask(),
+    dueDate: "2026-11-23",
+    reminderAt: new Date(2026, 10, 23, 9).toISOString(),
+    remindedAt: new Date(2026, 10, 23, 10).toISOString(),
+  };
+  expect(moveToDay(task, "today", "2026-11-23").remindedAt).toBe(
+    task.remindedAt,
+  );
+});
+it("verweigert stilles Verschieben in eine lokale Sommerzeitlücke", () => {
+  const previous = process.env.TZ;
+  process.env.TZ = "Europe/Berlin";
+  try {
+    const task = {
+      ...freshTask(),
+      plannedAt: new Date(2026, 2, 28, 2, 30).toISOString(),
+    };
+    expect(() => moveToDay(task, "today", "2026-03-29")).toThrow(
+      "Zeitumstellung",
+    );
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});

@@ -1,7 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { dayKey, parseDay, plusDays, type Task } from "./model";
-import { groupDayTasks, isOverdue } from "./taskPlanning";
+import {
+  completedToday,
+  groupDayTasks,
+  isOverdue,
+  type DayGroup,
+} from "./taskPlanning";
 
 export type PlanningMode = "all" | "dueToday" | "overdue";
 
@@ -11,14 +16,18 @@ export default function TaskSections({
   mode,
   filtered,
   renderTasks,
+  keepCompleted = false,
+  onMove,
 }: {
   tasks: Task[];
   today?: string;
   mode: PlanningMode;
   filtered: boolean;
   renderTasks: (tasks: Task[]) => ReactNode;
+  keepCompleted?: boolean;
+  onMove?: (id: string, target: DayGroup, revision: number) => void;
 }) {
-  const groups = groupDayTasks(tasks, today);
+  const groups = groupDayTasks(tasks, today, keepCompleted);
   const shortDate = (date: string) =>
     parseDay(date).toLocaleDateString("de-DE", {
       weekday: "short",
@@ -67,7 +76,9 @@ export default function TaskSections({
                   title: "Heute",
                   label: shortDate(today),
                   tasks: tasks.filter(
-                    (t) => t.status !== "done" && t.dueDate === today,
+                    (t) =>
+                      (t.status !== "done" && t.dueDate === today) ||
+                      (keepCompleted && completedToday(t, today)),
                   ),
                   tone: "today",
                 },
@@ -95,6 +106,8 @@ export default function TaskSections({
             dateLabel={section.label}
             count={section.tasks.length}
             tone={section.tone}
+            onMove={mode === "all" ? onMove : undefined}
+            target={section.id as DayGroup}
           >
             {section.tasks.length ? (
               renderTasks(section.tasks)
@@ -125,18 +138,54 @@ function TaskSection({
   count,
   tone,
   children,
+  onMove,
+  target,
 }: {
   title: string;
   dateLabel: string;
   count: number;
   tone: string;
   children: ReactNode;
+  onMove?: (id: string, target: DayGroup, revision: number) => void;
+  target: DayGroup;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [dragOver, setDragOver] = useState(false);
   return (
     <section
-      className={`day-section ${tone}`}
+      className={`day-section ${tone} ${dragOver ? "drop-active" : ""}`}
       aria-label={`${title}: ${count} ${count === 1 ? "Aufgabe" : "Aufgaben"}`}
+      onDragOver={(e) => {
+        if (
+          onMove &&
+          e.dataTransfer.types.includes("application/x-klar-task")
+        ) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setDragOver(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node))
+          setDragOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        setExpanded(true);
+        try {
+          const data = JSON.parse(
+            e.dataTransfer.getData("application/x-klar-task"),
+          );
+          if (
+            typeof data.id === "string" &&
+            Number.isSafeInteger(data.revision)
+          )
+            onMove?.(data.id, target, data.revision);
+        } catch {
+          /* Ignore unrelated or malformed drag payloads. */
+        }
+      }}
     >
       <h3 className="day-section-heading">
         <button

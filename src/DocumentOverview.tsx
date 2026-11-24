@@ -59,6 +59,7 @@ export default function DocumentOverview({
     sort: "name",
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openError, setOpenError] = useState("");
   const entries = useMemo(() => indexDocuments(tasks), [tasks]);
   const visible = useMemo(
     () => filterDocuments(entries, projects, filters),
@@ -147,6 +148,11 @@ export default function DocumentOverview({
         {visible.length} {visible.length === 1 ? "Eintrag" : "Einträge"}
         {filters.query ? ` für „${filters.query}“` : ""}
       </div>
+      {openError && (
+        <p role="alert" className="inline-error">
+          {openError}
+        </p>
+      )}
       {visible.length ? (
         <div className="documents-workspace">
           <div
@@ -161,6 +167,17 @@ export default function DocumentOverview({
                   aria-label={`${kinds[entry.kind]}: ${entry.name}`}
                   aria-pressed={selected?.id === entry.id}
                   onClick={() => setSelectedId(entry.id)}
+                  onDoubleClick={() => {
+                    if (!entry.attachment) return;
+                    setOpenError("");
+                    void api
+                      .openAttachment(entry.attachment)
+                      .catch((e) =>
+                        setOpenError(
+                          String(e instanceof Error ? e.message : e),
+                        ),
+                      );
+                  }}
                 >
                   <span className="document-type-icon">
                     <EntryIcon entry={entry} />
@@ -335,6 +352,22 @@ function DocumentPreview({
             </span>
             <button
               className="secondary small"
+              onClick={() => {
+                setExportMessage("");
+                void api
+                  .openAttachment(entry.attachment!)
+                  .catch((e) =>
+                    setExportMessage(
+                      String(e instanceof Error ? e.message : e),
+                    ),
+                  );
+              }}
+              title="Schreibgeschützte Kopie in der Windows-Standard-App öffnen"
+            >
+              <ArrowUpRight size={15} /> Öffnen
+            </button>
+            <button
+              className="secondary small"
               onClick={() => void exportFile()}
               disabled={exporting}
             >
@@ -388,8 +421,9 @@ function DocumentPreview({
             <EntryIcon entry={entry} />
             <p>Für dieses Dateiformat ist keine direkte Vorschau verfügbar.</p>
             <small>
-              Exportiere die Originaldatei und öffne sie in deinem gewohnten
-              Programm.
+              Über „Öffnen“ nutzt du deine Windows-Standard-App. Änderungen an
+              der schreibgeschützten Kopie bitte als neue Datei speichern und
+              erneut anhängen.
             </small>
           </div>
         )}

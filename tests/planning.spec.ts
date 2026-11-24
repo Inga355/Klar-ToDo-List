@@ -224,3 +224,155 @@ test("Offene Ansichten aktualisieren Tagesgruppen und Fälligkeitsfilter nach Mi
     page.getByRole("region", { name: "Morgen: 0 Aufgaben" }),
   ).toBeVisible();
 });
+
+test("Drag & Drop und Tastatur verschieben mit persistierter Fälligkeit", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page
+    .getByRole("region", { name: /^Heute:/ })
+    .getByRole("button", { expanded: true })
+    .click();
+  await page
+    .getByRole("region", { name: /^Morgen:/ })
+    .getByRole("button", { expanded: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Projektkonzept planen ziehen", exact: true })
+    .dragTo(page.getByRole("region", { name: /^Heute:/ }));
+  await expect(
+    page
+      .getByRole("region", { name: /^Heute:/ })
+      .getByRole("checkbox", { name: "Projektkonzept planen abhaken" }),
+  ).toBeVisible();
+  let task = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("klar-browser-preview-v1")!).tasks.find(
+      (t: any) => t.title === "Projektkonzept planen",
+    ),
+  );
+  expect(task.dueDate).toBe("2026-11-23");
+  expect(task.remindedAt).toBeNull();
+  await page
+    .getByLabel("Projektkonzept planen verschieben", { exact: true })
+    .selectOption("later");
+  task = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("klar-browser-preview-v1")!).tasks.find(
+      (t: any) => t.title === "Projektkonzept planen",
+    ),
+  );
+  expect(task.dueDate).toBeNull();
+  expect(task.plannedAt).toBeNull();
+  expect(task.reminderAt).toBeNull();
+  await expect(
+    page
+      .getByRole("region", { name: /^Später zu erledigen:/ })
+      .getByRole("checkbox", { name: "Projektkonzept planen abhaken" }),
+  ).toBeVisible();
+});
+
+test("Projekte haben Tagesgruppen und lassen sich ohne Verlust umbenennen", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page
+    .locator(".sidebar")
+    .getByRole("button", { name: /^Website/ })
+    .click();
+  await expect(page.getByRole("region", { name: /^Heute:/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Morgen:/ })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: /^Später zu erledigen:/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Projekt umbenennen oder bearbeiten" })
+    .click();
+  await page
+    .getByLabel("Projektname", { exact: true })
+    .fill("Website Relaunch");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Speichern", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("heading", { name: "Website Relaunch", exact: true })
+      .first(),
+  ).toBeVisible();
+  await expect(page.locator(".task-row")).toHaveCount(5);
+});
+
+test("Tagesabschluss bleibt bis Mitternacht sichtbar und dauerhaft unter Erledigt", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page
+    .getByRole("button", { name: "Einstellungen", exact: true })
+    .click();
+  await page
+    .getByLabel("Heute erledigte Aufgaben noch unter Heute anzeigen")
+    .check();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Schließen", exact: true })
+    .first()
+    .click();
+  await page
+    .getByRole("checkbox", { name: "Feedback einarbeiten abhaken" })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: /^Heute:/ })
+      .getByRole("checkbox", { name: "Feedback einarbeiten wieder öffnen" }),
+  ).toBeVisible();
+  await page.clock.setSystemTime(new Date("2026-11-24T00:00:05+01:00"));
+  await page.clock.runFor(30_000);
+  await expect(
+    page.getByRole("checkbox", { name: "Feedback einarbeiten wieder öffnen" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Erledigt", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Feedback einarbeiten wieder öffnen" }),
+  ).toBeVisible();
+});
+
+test("Wiederholungen erfordern vor dem Entfernen des Datums eine Bestätigung", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("klar-browser-preview-v1")!);
+    state.tasks.find((t: any) => t.title === "Feedback einarbeiten").repeat =
+      "weekly";
+    localStorage.setItem("klar-browser-preview-v1", JSON.stringify(state));
+    window.dispatchEvent(new Event("klar-change"));
+  });
+  await page
+    .getByLabel("Feedback einarbeiten verschieben", { exact: true })
+    .selectOption("later");
+  const dialog = page.getByRole("dialog", { name: "Wiederholung entfernen?" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  await expect(
+    page
+      .getByRole("region", { name: /^Morgen:/ })
+      .getByRole("checkbox", { name: "Feedback einarbeiten abhaken" }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Feedback einarbeiten verschieben", { exact: true })
+    .selectOption("later");
+  await dialog
+    .getByRole("button", { name: "Ohne Termin verschieben", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: /^Später zu erledigen:/ })
+      .getByRole("checkbox", { name: "Feedback einarbeiten abhaken" }),
+  ).toBeVisible();
+  const task = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("klar-browser-preview-v1")!).tasks.find(
+      (t: any) => t.title === "Feedback einarbeiten",
+    ),
+  );
+  expect(task.repeat).toBe("none");
+  expect(task.dueDate).toBeNull();
+});

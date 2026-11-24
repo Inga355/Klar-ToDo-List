@@ -38,12 +38,14 @@ export function moveToDay(
       : target === "tomorrow"
         ? plusDays(today, 1)
         : null;
+  const reminderAt = date ? moveTime(task.reminderAt, date) : null;
   return {
     ...task,
     dueDate: date,
     plannedAt: date ? moveTime(task.plannedAt, date) : null,
-    reminderAt: date ? moveTime(task.reminderAt, date) : null,
-    remindedAt: null,
+    reminderAt,
+    remindedAt:
+      !date || reminderAt !== task.reminderAt ? null : task.remindedAt,
     repeat: date ? task.repeat : "none",
   };
 }

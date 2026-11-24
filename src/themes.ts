@@ -92,6 +92,7 @@ export function themeVariables(theme: ThemeColors): Record<string, string> {
           "--theme-muted": p.muted,
           "--theme-text": p.text,
           "--theme-accent": p.accent,
+          "--theme-shadow": p.accent + "22",
           "--theme-on-accent": p.onAccent,
           "--theme-tint": mix(p.panel, p.accent, 0.14),
         }
