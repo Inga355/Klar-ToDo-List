@@ -22,6 +22,7 @@ import {
   FileText,
   Folder,
   Home,
+  GripVertical,
   Inbox,
   LayoutDashboard,
   ListTodo,
@@ -43,12 +44,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { createPortal } from "react-dom";
 import DocumentOverview from "./DocumentOverview";
 import TaskSections from "./TaskSections";
+import ThemeSettings from "./ThemeSettings";
+import { applyTheme } from "./themes";
 import {
   dayGroup,
   daysOverdue,
-  isDueTodayOrOverdue,
   isOverdue,
   planningDay,
+  completedToday,
+  moveToDay,
+  type DayGroup,
 } from "./taskPlanning";
 import { version as appVersion } from "../package.json";
 import {
@@ -95,6 +100,9 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [view, setView] = useState<View>("overview");
+  useEffect(() => {
+    if (state) applyTheme(state.settings.theme);
+  }, [state?.settings.theme.primary, state?.settings.theme.secondary]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("due");
   const [priority, setPriority] = useState("all");
@@ -102,7 +110,16 @@ export default function App() {
   const [editor, setEditor] = useState<Task | null>(null);
   const editorRevision = useRef(0);
   const [projectEditor, setProjectEditor] = useState<Project | null>(null);
+  const projectRevision = useRef(0);
+  const editProject = (project: Project) => {
+    projectRevision.current = stateRef.current!.revision;
+    setProjectEditor(project);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingMove, setPendingMove] = useState<{
+    id: string;
+    revision: number;
+  } | null>(null);
   const [notice, setNotice] = useState("");
   const [undo, setUndo] = useState<{ id: string; revision: number } | null>(
     null,
@@ -212,6 +229,7 @@ export default function App() {
   const planningView = ["overview", "today", "dueToday", "overdue"].includes(
     view,
   );
+  const groupedView = planningView || view.startsWith("project:");
   const dueFilter = view === "dueToday" || view === "overdue";
   const navigateDue = (target: "dueToday" | "overdue") => {
     setSearch("");
@@ -225,18 +243,25 @@ export default function App() {
     setView("overview");
   };
   const project = state.projects.find((p) => `project:${p.id}` === view);
+  const dailyTasks = state.tasks.filter(
+    (t) =>
+      t.status !== "done" ||
+      (state.settings.keepCompletedToday && completedToday(t, clock)),
+  );
   let tasks =
     view === "done"
       ? state.tasks.filter((t) => t.status === "done")
       : view === "dueToday"
-        ? active.filter((t) => isDueTodayOrOverdue(t, clock))
+        ? dailyTasks.filter((t) => !!t.dueDate && t.dueDate <= clock)
         : view === "overdue"
           ? overdue
           : view === "inbox"
             ? active.filter((t) => !t.projectId)
             : project
-              ? active.filter((t) => t.projectId === project.id)
-              : active;
+              ? dailyTasks.filter((t) => t.projectId === project.id)
+              : planningView
+                ? dailyTasks
+                : active;
   tasks = orderTasks(
     tasks.filter(
       (t) =>
@@ -246,7 +271,7 @@ export default function App() {
           .includes(search.toLocaleLowerCase("de")),
     ),
     sort,
-    planningView ? (t) => planningDay(t) ?? "9999" : undefined,
+    groupedView ? (t) => planningDay(t) ?? "9999" : undefined,
   );
   const title =
     {
@@ -275,6 +300,38 @@ export default function App() {
       setEditor(structuredClone(next.tasks.find((t) => t.id === task.id)!));
     return next;
   };
+  const moveTask = (
+    id: string,
+    target: DayGroup,
+    revision: number,
+    confirmed = false,
+  ) =>
+    run(async () => {
+      const current = stateRef.current!;
+      if (current.revision !== revision)
+        throw new Error(
+          "Die Aufgabe wurde inzwischen geändert. Bitte erneut verschieben.",
+        );
+      const task = current.tasks.find((t) => t.id === id);
+      if (!task) throw new Error("Aufgabe nicht mehr vorhanden.");
+      if (target === "later" && task.repeat !== "none" && !confirmed) {
+        setPendingMove({ id, revision });
+        return;
+      }
+      const moved = moveToDay(task, target, clock);
+      if (
+        ["dueDate", "plannedAt", "reminderAt", "remindedAt", "repeat"].every(
+          (key) => moved[key as keyof Task] === task[key as keyof Task],
+        )
+      )
+        return;
+      await apply({ type: "save_task", task: moved }, revision);
+      setNotice(
+        target === "later"
+          ? "Aufgabe ohne Termin eingeordnet"
+          : `Aufgabe nach ${target === "today" ? "Heute" : "Morgen"} verschoben${moved.reminderAt && new Date(moved.reminderAt).getTime() <= Date.now() ? " · Die Erinnerungszeit liegt bereits in der Vergangenheit." : ""}`,
+      );
+    });
   const taskList = (list: Task[]) =>
     list.length ? (
       <div className="task-list">
@@ -286,6 +343,8 @@ export default function App() {
             busy={busy}
             onOpen={() => edit(t)}
             today={clock}
+            revision={state.revision}
+            onMove={groupedView && !dueFilter && !isMini ? moveTask : undefined}
             onToggle={() =>
               run(async () => {
                 const next = await apply({ type: "toggle_task", id: t.id });
@@ -369,7 +428,7 @@ export default function App() {
               className="icon-button"
               aria-label="Projekt hinzufügen"
               onClick={() =>
-                setProjectEditor({
+                editProject({
                   id: crypto.randomUUID(),
                   name: "",
                   color: "#ff851b",
@@ -397,7 +456,7 @@ export default function App() {
               <button
                 className="add-project"
                 onClick={() =>
-                  setProjectEditor({
+                  editProject({
                     id: crypto.randomUUID(),
                     name: "",
                     color: "#ff851b",
@@ -508,10 +567,10 @@ export default function App() {
                 {project && (
                   <button
                     className="icon-button"
-                    aria-label="Projekt bearbeiten"
-                    onClick={() => setProjectEditor({ ...project })}
+                    aria-label="Projekt umbenennen oder bearbeiten"
+                    onClick={() => editProject({ ...project })}
                   >
-                    <SquarePen size={20} />
+                    <SquarePen size={18} /> Projekt bearbeiten
                   </button>
                 )}
                 <button className="primary" onClick={add}>
@@ -766,7 +825,7 @@ export default function App() {
                       <option value="title">Nach Titel</option>
                     </select>
                   </label>
-                  {!planningView && (
+                  {!groupedView && (
                     <label className="select-wrap">
                       <span className="sr-only">Gruppieren</span>
                       <select
@@ -780,7 +839,7 @@ export default function App() {
                     </label>
                   )}
                 </div>
-                {planningView ? (
+                {groupedView ? (
                   <TaskSections
                     key={dueFilter ? view : "all"}
                     tasks={tasks}
@@ -794,6 +853,8 @@ export default function App() {
                     }
                     filtered={!!search.trim() || priority !== "all"}
                     renderTasks={taskList}
+                    keepCompleted={state.settings.keepCompletedToday}
+                    onMove={moveTask}
                   />
                 ) : group === "none" ? (
                   taskList(tasks)
@@ -891,7 +952,7 @@ export default function App() {
                       className="icon-button"
                       aria-label="Neues Projekt"
                       onClick={() =>
-                        setProjectEditor({
+                        editProject({
                           id: crypto.randomUUID(),
                           name: "",
                           color: "#ff851b",
@@ -942,7 +1003,7 @@ export default function App() {
                       <button
                         className="text-button"
                         onClick={() =>
-                          setProjectEditor({
+                          editProject({
                             id: crypto.randomUUID(),
                             name: "",
                             color: "#ff851b",
@@ -1041,6 +1102,41 @@ export default function App() {
           onDraft={setEditor}
         />
       )}
+      {pendingMove && (
+        <Dialog
+          title="Wiederholung entfernen?"
+          onClose={() => setPendingMove(null)}
+        >
+          <div className="dialog-body">
+            <p>
+              Beim Verschieben nach Später werden Fälligkeit, Planung,
+              Erinnerung und Wiederholung entfernt. Die Aufgabe und ihre Anhänge
+              bleiben erhalten.
+            </p>
+          </div>
+          <footer className="dialog-footer">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setPendingMove(null)}
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => {
+                const pending = pendingMove;
+                setPendingMove(null);
+                moveTask(pending.id, "later", pending.revision, true);
+              }}
+            >
+              Ohne Termin verschieben
+            </button>
+          </footer>
+        </Dialog>
+      )}
       {projectEditor && (
         <ProjectEditor
           project={projectEditor}
@@ -1049,7 +1145,10 @@ export default function App() {
           onClose={() => setProjectEditor(null)}
           onSave={(p) =>
             run(async () => {
-              await apply({ type: "save_project", project: p });
+              await apply(
+                { type: "save_project", project: p },
+                projectRevision.current,
+              );
               setProjectEditor(null);
               setView(`project:${p.id}`);
               setNotice("Projekt gespeichert");
@@ -1057,7 +1156,10 @@ export default function App() {
           }
           onDelete={() =>
             run(async () => {
-              await apply({ type: "delete_project", id: projectEditor.id });
+              await apply(
+                { type: "delete_project", id: projectEditor.id },
+                projectRevision.current,
+              );
               setProjectEditor(null);
               setView("inbox");
             })
@@ -1105,6 +1207,8 @@ function TaskRow({
   onOpen,
   onToggle,
   today,
+  revision,
+  onMove,
 }: {
   task: Task;
   project?: Project;
@@ -1112,6 +1216,8 @@ function TaskRow({
   onOpen: () => void;
   onToggle: () => void;
   today: string;
+  revision: number;
+  onMove?: (id: string, target: DayGroup, revision: number) => void;
 }) {
   const overdue = isOverdue(t, today);
   const lateDays = daysOverdue(t, today);
@@ -1120,6 +1226,40 @@ function TaskRow({
     <div
       className={`task-row ${t.status === "done" ? "completed" : ""} ${overdue ? "task-overdue" : ""}`}
     >
+      {onMove && t.status !== "done" && (
+        <div className="task-move">
+          <button
+            type="button"
+            className="icon-button drag-handle"
+            draggable={!busy}
+            aria-label={`${t.title} ziehen`}
+            title="Aufgabe in eine Tagesgruppe ziehen"
+            onDragStart={(e) => {
+              e.dataTransfer.setData(
+                "application/x-klar-task",
+                JSON.stringify({ id: t.id, revision }),
+              );
+              e.dataTransfer.effectAllowed = "move";
+            }}
+          >
+            <GripVertical size={17} />
+          </button>
+          <select
+            aria-label={`${t.title} verschieben`}
+            value=""
+            disabled={busy}
+            onChange={(e) => {
+              if (e.target.value)
+                onMove(t.id, e.target.value as DayGroup, revision);
+            }}
+          >
+            <option value="">Verschieben …</option>
+            <option value="today">Heute</option>
+            <option value="tomorrow">Morgen</option>
+            <option value="later">Später · ohne Termin</option>
+          </select>
+        </div>
+      )}
       <button
         className="checkbox"
         role="checkbox"
@@ -1668,6 +1808,7 @@ function AttachmentCard({
 }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
   useEffect(() => {
     if (api.native && a.mime.startsWith("image/") && a.mime !== "image/svg+xml")
       api
@@ -1675,43 +1816,57 @@ function AttachmentCard({
         .then(setUrl)
         .catch((e) => setError(message(e)));
   }, [a.id, a.mime]);
+  const perform = (action: () => Promise<unknown>) => {
+    if (working) return;
+    setWorking(true);
+    setError("");
+    void action()
+      .catch((e) => setError(message(e)))
+      .finally(() => setWorking(false));
+  };
   return (
-    <div className="attachment">
-      {url ? (
-        <a href={url} target="_blank" rel="noreferrer">
-          <img src={url} alt={a.name} />
-        </a>
-      ) : (
-        <Paperclip size={22} />
-      )}
+    <div
+      className="attachment"
+      onDoubleClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button"))
+          perform(() => api.openAttachment(a));
+      }}
+      title="Doppelklick öffnet die Datei in deiner Windows-Standard-App"
+    >
+      {url ? <img src={url} alt={a.name} /> : <Paperclip size={22} />}
       <span>
         <strong>{a.name}</strong>
         <small>
-          {Math.max(1, Math.round(a.size / 1024))} KB{" "}
-          {error && "· Vorschau nicht verfügbar"}
+          {Math.max(1, Math.round(a.size / 1024))} KB · Doppelklick zum Öffnen
         </small>
+        {error && (
+          <small role="alert" className="inline-error">
+            {error}
+          </small>
+        )}
       </span>
       <button
         type="button"
         className="icon-button"
+        disabled={working}
+        aria-label={`${a.name} öffnen`}
+        onClick={() => perform(() => api.openAttachment(a))}
+      >
+        <ArrowUpRight size={16} />
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        disabled={working}
         aria-label={`${a.name} speichern`}
-        onClick={() => {
-          void (async () => {
-            const { save } = await import("@tauri-apps/plugin-dialog");
-            const path = await save({
-              defaultPath: a.name.split(/[\\/]/).pop(),
-            });
-            if (path) {
-              await invoke("save_attachment", { id: a.id, path });
-            }
-          })().catch((e) => setError(message(e)));
-        }}
+        onClick={() => perform(() => api.exportAttachment(a))}
       >
         <Download size={16} />
       </button>
       <button
         type="button"
         className="icon-button"
+        disabled={working}
         aria-label={`${a.name} entfernen`}
         onClick={onRemove}
       >
@@ -1843,6 +1998,38 @@ function SettingsDialog({
   return (
     <Dialog title="Dein Klar. Deine Einstellungen." onClose={onClose} wide>
       <div className="dialog-body settings-body">
+        <ThemeSettings
+          settings={state.settings}
+          disabled={working}
+          onSave={(settings) => perform(() => onSave(settings))}
+        />
+        <div className="settings-section">
+          <h3>
+            <CheckCheck size={18} /> Dein Tagesabschluss
+          </h3>
+          <label className="toggle-line">
+            <span>
+              Heute erledigte Aufgaben noch unter Heute anzeigen
+              <small>
+                Abgehakt bis zum nächsten Tag. Unter Erledigt bleiben sie
+                dauerhaft erhalten.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              disabled={working}
+              checked={state.settings.keepCompletedToday}
+              onChange={(e) =>
+                perform(() =>
+                  onSave({
+                    ...state.settings,
+                    keepCompletedToday: e.target.checked,
+                  }),
+                )
+              }
+            />
+          </label>
+        </div>
         <div className="settings-section">
           <h3>
             <Home size={18} /> Auf deinem Computer

@@ -60,6 +60,49 @@ pub struct Settings {
     pub close_to_tray: bool,
     pub mini_filter: String,
     pub mini_pinned: bool,
+    #[serde(default)]
+    pub keep_completed_today: bool,
+    #[serde(default)]
+    pub theme: ThemeColors,
+    #[serde(default = "default_theme_favorites")]
+    pub theme_favorites: Vec<ThemeFavorite>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThemeColors {
+    pub primary: String,
+    pub secondary: String,
+}
+impl Default for ThemeColors {
+    fn default() -> Self {
+        Self {
+            primary: "#211f1d".into(),
+            secondary: "#ff851b".into(),
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThemeFavorite {
+    pub name: String,
+    pub primary: String,
+    pub secondary: String,
+}
+fn default_theme_favorites() -> Vec<ThemeFavorite> {
+    [
+        ("Klar · Bernstein", "#211f1d", "#ff851b"),
+        ("Nord · Eisblau", "#1d252c", "#62c6f5"),
+        ("Wald · Limette", "#202a24", "#a9d977"),
+        ("Abend · Lavendel", "#292231", "#c8a1fa"),
+        ("Rosé · Koralle", "#2c2225", "#ff9aaa"),
+    ]
+    .into_iter()
+    .map(|(name, primary, secondary)| ThemeFavorite {
+        name: name.into(),
+        primary: primary.into(),
+        secondary: secondary.into(),
+    })
+    .collect()
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -68,6 +111,9 @@ impl Default for Settings {
             close_to_tray: true,
             mini_filter: "today".into(),
             mini_pinned: false,
+            keep_completed_today: false,
+            theme: ThemeColors::default(),
+            theme_favorites: default_theme_favorites(),
         }
     }
 }
@@ -138,6 +184,23 @@ fn ensure(ok: bool, message: &str) -> Result<()> {
 }
 
 pub fn validate(state: &AppState) -> Result<()> {
+    let color = |v: &str| {
+        v.len() == 7 && v.starts_with('#') && v[1..].bytes().all(|b| b.is_ascii_hexdigit())
+    };
+    ensure(
+        color(&state.settings.theme.primary) && color(&state.settings.theme.secondary),
+        "Ungültige Theme-Farben",
+    )?;
+    ensure(
+        state.settings.theme_favorites.len() == 5
+            && state.settings.theme_favorites.iter().all(|t| {
+                !t.name.trim().is_empty()
+                    && t.name.chars().count() <= 40
+                    && color(&t.primary)
+                    && color(&t.secondary)
+            }),
+        "Bitte fünf gültige Theme-Favoriten angeben",
+    )?;
     ensure(state.schema_version == 1, "Unbekannte Datenversion")?;
     ensure(
         state.tasks.len() <= 50_000 && state.projects.len() <= 2_000,
@@ -740,6 +803,12 @@ mod tests {
             .unwrap();
         s.add_attachment(&id, "Notiz.txt".into(), "text/plain".into(), b"Hallo", 1)
             .unwrap();
+        let mut settings = s.load().unwrap().settings;
+        settings.keep_completed_today = true;
+        settings.theme.primary = "#1d252c".into();
+        settings.theme_favorites[0].name = "Mein Nord".into();
+        s.apply(Operation::Settings { settings }, Some(2), "test")
+            .unwrap();
         let backup = dir.path().join("test.klar");
         s.backup(&backup).unwrap();
         let (_dir2, target) = store();
@@ -750,7 +819,25 @@ mod tests {
             b"Hallo"
         );
         assert_eq!(restored.settings.ai_access, "off");
+        assert!(restored.settings.keep_completed_today);
+        assert_eq!(restored.settings.theme.primary, "#1d252c");
+        assert_eq!(restored.settings.theme_favorites[0].name, "Mein Nord");
         assert_eq!(target.read_attachment(&attachment.id).unwrap(), b"Hallo");
+    }
+    #[test]
+    fn legacy_settings_receive_defaults_and_invalid_favorites_are_rejected() {
+        let old = serde_json::json!({"aiAccess":"read","closeToTray":true,"miniFilter":"today","miniPinned":false});
+        let settings: Settings = serde_json::from_value(old).unwrap();
+        assert!(!settings.keep_completed_today);
+        assert_eq!(settings.theme.primary, "#211f1d");
+        assert_eq!(settings.theme_favorites.len(), 5);
+        let (_dir, s) = store();
+        let mut invalid = settings;
+        invalid.theme_favorites.pop();
+        assert!(s
+            .apply(Operation::Settings { settings: invalid }, Some(0), "test")
+            .is_err());
+        assert_eq!(s.load().unwrap().revision, 0);
     }
     #[test]
     fn repeat_creates_one_next_occurrence() {

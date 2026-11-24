@@ -86,12 +86,26 @@ async function documentsFixture(page: Page) {
     ({ state, blobs }) => {
       const w = window as unknown as Record<string, unknown>;
       w.isTauri = true;
+      const calls: { command: string; args: Record<string, unknown> }[] = [];
+      w.__klarCalls = calls;
       let callback = 0;
       w.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
       w.__TAURI_INTERNALS__ = {
+        convertFileSrc: () =>
+          "data:image/png;base64," + blobs[Object.keys(blobs)[1]],
         transformCallback: () => ++callback,
         unregisterCallback: () => {},
         invoke: async (command: string, args: Record<string, unknown>) => {
+          calls.push({ command, args });
+          if (command === "open_attachment" || command === "save_attachment")
+            return;
+          if (command === "attachment_path") return "C:\\KlarTest\\Anhang";
+          if (command === "plugin:path|resolve_directory")
+            return "C:\\Users\\Test\\Downloads";
+          if (command === "plugin:path|join")
+            return (args.paths as string[]).join("\\");
+          if (command === "plugin:dialog|save")
+            return "C:\\Users\\Test\\Downloads\\Angebot.pdf";
           if (command === "load_state") return structuredClone(state);
           if (command === "read_attachment") {
             const value = blobs[String(args.id)];
@@ -205,4 +219,67 @@ test("Lokale Vorschau zeigt PDF-Seiten, Bilder und Text; andere Formate bleiben 
     page.getByRole("button", { name: "Nächste PDF-Seite" }),
   ).toBeEnabled();
   await page.screenshot({ path: "test-results/documents.png", fullPage: true });
+});
+
+test("Doppelklick öffnet Anhänge und Export startet im Download-Ordner", async ({
+  page,
+}) => {
+  await documentsFixture(page);
+  await page
+    .getByRole("button", { name: "PDF: Angebot.pdf", exact: true })
+    .dblclick();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__klarCalls.filter(
+            (c: any) => c.command === "open_attachment",
+          ).length,
+      ),
+    )
+    .toBe(1);
+  await page.getByRole("button", { name: "Exportieren", exact: true }).click();
+  await expect(
+    page.getByText("Datei exportiert.", { exact: true }),
+  ).toBeVisible();
+  const calls = await page.evaluate(() => (window as any).__klarCalls);
+  expect(
+    calls.find((c: any) => c.command === "plugin:dialog|save").args.options
+      .defaultPath,
+  ).toBe("C:\\Users\\Test\\Downloads\\Angebot.pdf");
+  expect(calls.some((c: any) => c.command === "save_attachment")).toBe(true);
+  await page
+    .getByRole("button", {
+      name: "Layout abstimmen Website · Offen",
+      exact: true,
+    })
+    .click();
+  await page
+    .locator(".attachment")
+    .filter({ hasText: "Screenshot.png" })
+    .getByText("Screenshot.png", { exact: true })
+    .dblclick();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__klarCalls.filter(
+            (c: any) => c.command === "open_attachment",
+          ).length,
+      ),
+    )
+    .toBe(2);
+  await page
+    .getByRole("button", { name: "Screenshot.png öffnen", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__klarCalls.filter(
+            (c: any) => c.command === "open_attachment",
+          ).length,
+      ),
+    )
+    .toBe(3);
 });

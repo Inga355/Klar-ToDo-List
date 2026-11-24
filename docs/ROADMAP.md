@@ -13,6 +13,7 @@ Jeder Meilenstein erhält kleine Commits und eine eigene PR nach main. Abhängig
 | M6 | Auslieferung und Integration | Sicherung/Wiederherstellung, lokale KI-Schnittstelle, Installer |
 | M7 | Dokumentenübersicht | Zentrale Dateien/Notizen, Suche, Projekt-/Statusfilter, lokale Vorschau und Aufgabenverknüpfungen; Aufbewahrung als abgestimmtes Folgekonzept |
 | M8 | Tagesgruppen und Fälligkeitsfilter | Übersicht/Mein Tag mit Heute/Morgen/Später; eigene strikte Heute-fällig-Ansicht, dezente Überfälligkeit und Kalendertagtests |
+| M9 | Klar 0.4 – Tagesplanung und Personalisierung | Verschieben zwischen Tagesgruppen, Projekte gruppieren/umbenennen, Tagesabschluss, Anhänge öffnen/Downloads, kontrastgeprüfte Farben und fünf Theme-Favoriten |
 
 ## Qualitätsziele
 

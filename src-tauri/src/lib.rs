@@ -1,3 +1,4 @@
+mod attachment_open;
 mod desktop;
 pub mod mcp;
 pub mod store;
@@ -140,6 +141,7 @@ pub fn run() {
             attach_file,
             attachment_path,
             read_attachment,
+            attachment_open::open_attachment,
             save_attachment,
             export_backup,
             import_backup,
