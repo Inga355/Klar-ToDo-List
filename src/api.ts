@@ -7,7 +7,10 @@ const KEY = "klar-browser-preview-v1";
 export async function loadState(): Promise<AppState> {
   if (native) return invoke("load_state");
   const raw = localStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : emptyState();
+  if (!raw) return emptyState();
+  const state = JSON.parse(raw) as AppState;
+  state.settings = { ...emptyState().settings, ...state.settings };
+  return state;
 }
 export async function subscribe(callback: () => void): Promise<() => void> {
   if (native) return listen("state-changed", callback);
@@ -128,12 +131,23 @@ export async function exportAttachment(
       "Dateien können in der installierten Desktop-App exportiert werden.",
     );
   const { save } = await import("@tauri-apps/plugin-dialog");
+  const { downloadDir, join } = await import("@tauri-apps/api/path");
   const path = await save({
-    defaultPath: attachment.name.split(/[\\/]/).pop(),
+    defaultPath: await join(
+      await downloadDir(),
+      attachment.name.split(/[\\/]/).pop() || "Anhang",
+    ),
   });
   if (!path) return false;
   await invoke("save_attachment", { id: attachment.id, path });
   return true;
+}
+export async function openAttachment(attachment: Attachment): Promise<void> {
+  if (!native)
+    throw new Error(
+      "Direktes Öffnen ist in der installierten Windows-App verfügbar.",
+    );
+  await invoke("open_attachment", { id: attachment.id });
 }
 export async function openMini(): Promise<void> {
   if (native) await invoke("open_mini");
