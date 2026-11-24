@@ -111,3 +111,42 @@ describe("Tagesgruppen und strikte Fälligkeit", () => {
     ).toEqual([earlier.id, later.id, undated.id]);
   });
 });
+import { completedToday, moveToDay } from "./taskPlanning";
+
+it("verschiebt lokale Uhrzeiten und entfernt alle Terminfelder bei Später", () => {
+  const task = {
+    ...freshTask(),
+    dueDate: "2026-11-27",
+    repeat: "weekly" as const,
+    plannedAt: new Date(2026, 10, 27, 11, 15).toISOString(),
+    reminderAt: new Date(2026, 10, 27, 10, 45).toISOString(),
+    remindedAt: new Date().toISOString(),
+  };
+  const tomorrow = moveToDay(task, "tomorrow", "2026-11-23");
+  expect(tomorrow.dueDate).toBe("2026-11-24");
+  expect(new Date(tomorrow.reminderAt!).getHours()).toBe(10);
+  expect(new Date(tomorrow.plannedAt!).getDate()).toBe(24);
+  expect(tomorrow.remindedAt).toBeNull();
+  expect(tomorrow.repeat).toBe("weekly");
+  expect(moveToDay(task, "later", "2026-11-23")).toMatchObject({
+    dueDate: null,
+    plannedAt: null,
+    reminderAt: null,
+    remindedAt: null,
+    repeat: "none",
+  });
+  expect(task.dueDate).toBe("2026-11-27");
+});
+it("zeigt nur am lokalen Abschlusstag erledigte Aufgaben in Heute, ohne sie zu löschen", () => {
+  const task = {
+    ...freshTask(),
+    status: "done" as const,
+    completedAt: new Date(2026, 10, 23, 23, 55).toISOString(),
+    dueDate: "2026-12-01",
+  };
+  expect(completedToday(task, "2026-11-23")).toBe(true);
+  expect(groupDayTasks([task], "2026-11-23", true).today).toHaveLength(1);
+  expect(groupDayTasks([task], "2026-11-24", true).today).toHaveLength(0);
+  expect(task.status).toBe("done");
+  expect(() => moveToDay(task, "today")).toThrow();
+});

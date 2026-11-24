@@ -1,3 +1,9 @@
+import {
+  DEFAULT_THEME,
+  DEFAULT_FAVORITES,
+  type ThemeColors,
+  type ThemeFavorite,
+} from "./themes";
 export type Priority = "high" | "normal" | "low";
 export type Status = "open" | "progress" | "waiting" | "done";
 export interface Project {
@@ -35,6 +41,9 @@ export interface Settings {
   closeToTray: boolean;
   miniFilter: string;
   miniPinned: boolean;
+  keepCompletedToday: boolean;
+  theme: ThemeColors;
+  themeFavorites: ThemeFavorite[];
 }
 export interface AppState {
   schemaVersion: number;
@@ -134,6 +143,9 @@ export function emptyState(): AppState {
       closeToTray: true,
       miniFilter: "today",
       miniPinned: false,
+      keepCompletedToday: false,
+      theme: { ...DEFAULT_THEME },
+      themeFavorites: DEFAULT_FAVORITES.map((t) => ({ ...t })),
     },
     history: [],
   };
