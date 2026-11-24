@@ -21,6 +21,8 @@ Bei Entwicklung: `cargo build --manifest-path src-tauri/Cargo.toml --bin klar-mc
 
 ## Werkzeuge
 
+Nach dem Update auf Klar 0.4 Codex einmal vollständig neu starten. Der Installer ersetzt `klar-mcp.exe`; ein bereits laufender älterer Prozess kennt die neuen Einstellungsfelder noch nicht. Die vorhandene Serverkonfiguration und Klar-Zugriffsfreigabe bleiben erhalten.
+
 - `list_tasks`: Aufgaben einschließlich Notizen und Anhangsmetadaten; Projektliste und aktuelle Revision. Optional Suchtext, Projektfilter und erledigte Aufgaben. Maximal 500 Aufgaben pro Antwort.
 - `create_task`: Aufgabe mit Titel, Priorität, Projekt, Notiz, Datum und Erinnerung erstellen.
 - `update_task`: Ausgewählte Aufgabenfelder mit aktueller Revision bearbeiten. Keine Anhänge, IDs oder Freigaben ändern.

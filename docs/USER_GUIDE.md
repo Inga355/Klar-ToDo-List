@@ -15,6 +15,20 @@ Klar über das Desktopsymbol oder das Startmenü öffnen. Beim ersten Start gibt
 
 ## Termine
 
+### Aufgaben in Tagesgruppen verschieben
+
+In Übersicht, Mein Tag und innerhalb eines Projekts kannst du offene Aufgaben am Griff links nach **Heute**, **Morgen** oder **Später zu erledigen** ziehen. Eingeklappte Zielgruppen öffnen sich beim Ablegen. Alternativ steht neben dem Griff eine per Tastatur bedienbare Auswahl bereit.
+
+- Heute/Morgen setzt die Fälligkeit auf diesen Tag. Bereits vorhandene Planungs- und Erinnerungszeiten wechseln unter Beibehaltung ihrer lokalen Uhrzeit auf den Zieltag. Eine dadurch bereits vergangene Erinnerung wird nachgeholt; die App weist darauf hin. Unveränderte Erinnerungstermine lösen keine zweite Benachrichtigung aus.
+- Später entfernt Fälligkeit, Planung und Erinnerung. Bei einer Wiederholung ist vorher eine Bestätigung nötig; sie wird ebenfalls entfernt, da Wiederholungen ein Datum benötigen. Inhalte und Anhänge bleiben erhalten.
+- Nach einer zwischenzeitlichen Änderung aus einem anderen Fenster wird ein veralteter Verschiebevorgang abgelehnt. Bei nicht existierenden Uhrzeiten während der Sommerzeitumstellung bitte den Termin im Aufgabenfenster wählen.
+
+Projekte zeigen ebenfalls Heute/Morgen/Später. Über **Projekt bearbeiten** oben neben „Aufgabe“ kannst du den Namen und die Farbe ändern. Die Projekt-ID sowie alle Aufgabenverknüpfungen bleiben erhalten.
+
+### Tagesabschluss
+
+Unter **Einstellungen → Dein Tagesabschluss** lässt sich „Heute erledigte Aufgaben noch unter Heute anzeigen“ aktivieren. Heute abgeschlossene Aufgaben erscheinen abgehakt unter Heute, auch wenn sie vorher in einer anderen Gruppe standen. Nach dem lokalen Tageswechsel verschwinden sie dort automatisch, bleiben aber dauerhaft unter **Erledigt**. Standardmäßig bleibt das bisherige Verhalten aktiv: erledigte Aufgaben nur unter Erledigt. Der strikte Filter Heute fällig enthält auch bei aktivierter Option nur Aufgaben mit Fälligkeit heute oder früher. Die Miniansicht zeigt weiterhin offene Aufgaben.
+
 **Fällig am** bezeichnet die Frist. **Geplant für** ist der Arbeitszeitpunkt. **Erinnern am** ist eine unabhängige Windows-Benachrichtigung. Verschieben im Kalender plant eine Aufgabe um 09:00 Uhr ein und lässt die Frist bestehen.
 
 Wiederholungen benötigen eine Fälligkeit. Beim Abhaken entsteht genau eine nächste zukünftige Aufgabe. Verpasste Wiederholungen werden übersprungen. Monatliche Wiederholung verwendet einen Kalendermonat und begrenzt auf den letzten verfügbaren Tag.
@@ -34,6 +48,18 @@ Unter **Dokumente** findest du alle zu Aufgaben gehörenden Dateien und nicht le
 Die Suche findet Dateinamen, Aufgabentitel, Projekte und Aufgabennotizen. Sie durchsucht nicht den Inhalt von PDF-/Office-Dateien. Filter begrenzen die Ergebnisse nach Projekt, Dateiart und offenen/erledigten Aufgaben. Bei geteilten Dateien beziehen sich diese Filter auf dieselbe Aufgabenverknüpfung.
 
 Ein Klick zeigt die lokale Vorschau: Bilder, PDFs mit Seitenwechsel, Textdateien oder die Aufgabennotiz. Andere Formate, etwa Word-Dateien, können exportiert und in einem passenden Programm geöffnet werden. Für verschlüsselte oder nicht unterstützte PDFs steht ebenfalls der Export bereit. Die Textvorschau zeigt bis zu 200.000 Zeichen; die Originaldatei wird dabei nicht verändert. Über die Aufgabenverknüpfung kannst du Notizen bearbeiten und neue Dateien anhängen.
+
+**Doppelklick** auf eine Datei im Aufgabenfenster oder in der Dokumentenliste öffnet sie in der Windows-Standard-App; alternativ den Öffnen-Button verwenden. Klar öffnet eine schreibgeschützte Kopie mit Dateiendung unter `opened` im App-Datenordner. Änderungen bitte unter neuem Namen speichern und erneut anhängen. Übliche Bilder, PDF, Text, makrofreie Office-Dateien und Medien sind freigegeben; Skripte, ausführbare Dateien, HTML/SVG und Office-Makroformate werden nicht direkt gestartet. Für andere Formate bleibt der Export verfügbar. **Speichern/Exportieren** schlägt den Windows-Download-Ordner vor; Ziel und Dateiname kannst du im Dialog ändern.
+
+## Farben und Favoriten
+
+Unter **Einstellungen → Farben & Theme-Favoriten** kannst du Primärfarbe (Flächen) und Sekundärfarbe (Akzente) kombinieren. Eine Vorschau zeigt die wirksamen Farben vor dem Anwenden. Die Primärfarbe bleibt im Dunkelmodus; zu helle Flächen werden abgedunkelt, zu dunkle Akzente aufgehellt. Text und Akzente werden gegen die Grundflächen mit mindestens 4,5:1 Kontrast berechnet. Ampelprioritäten und Überfälligkeit behalten ihre eigenen Farben.
+
+Fünf Favoriten sind vorbelegt. Ein Klick wendet einen Favoriten an. Um eine Kombination dauerhaft zu speichern, Farben wählen, Favoritenplatz und Namen angeben und **Auf Platz … speichern & anwenden** wählen. Nur dieser Platz wird ersetzt. **Klar-Original** stellt das ursprüngliche Braun/Orange wieder her. Farben und Favoriten gelten auch in der Miniansicht, bleiben nach Neustart erhalten und sind Teil der Sicherung.
+
+### Update auf 0.4
+
+Nach Installation Codex einmal vollständig neu starten, damit auch der lokale MCP-Prozess die neuen Einstellungsfelder unterstützt. Für einen Rückwechsel zu einer alten Klar-Version die vollständige Sicherung von vor dem Update verwenden; alte Versionen kennen die zusätzlichen Einstellungen nicht. Aufgaben und Anhänge werden beim Update nicht gelöscht.
 
 Es gibt noch keine automatische Löschung nach Erledigung. Der Vorschlag dafür steht in [Aufbewahrungskonzept](RETENTION_CONCEPT.md). Die Übersicht verändert keine Aufbewahrungsfristen und verschiebt keine Dateien.
 
